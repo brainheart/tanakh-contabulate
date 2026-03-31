@@ -2,7 +2,7 @@
 
 Static single-page contabulate search for the Hebrew Bible (Tanakh), built from Westminster Leningrad Codex OSIS XML with right-to-left Hebrew display.
 
-The generated site lives in [docs](/Users/klaus/Projects/tanach-contabulate/docs) and is designed for GitHub Pages deployment at `hebrew.contabulate.org`.
+The generated site lives in [docs](/Users/klaus/Projects/tanakh-contabulate/docs) and is designed for GitHub Pages deployment at `hebrew.contabulate.org`.
 
 ## Source Text
 

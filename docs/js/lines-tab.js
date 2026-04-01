@@ -98,7 +98,7 @@
       let searchPattern = null;
       if (isRegex) {
         try {
-          searchPattern = new RegExp(query, 'i');
+          searchPattern = new RegExp(window.normalizeTerm(query), 'i');
         } catch (e) {
           return null;
         }

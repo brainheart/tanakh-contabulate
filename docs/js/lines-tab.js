@@ -103,7 +103,7 @@
           return null;
         }
       }
-      const queryTokens = window.normalizeHebrew(query).split(/\s+/).filter(Boolean).slice(0, n);
+      const queryTokens = window.normalizeTerm(query).split(/\s+/).filter(Boolean).slice(0, n);
       const queryNgram = queryTokens.join(' ');
 
       for (const line of allLines) {
@@ -242,10 +242,8 @@
         const tdPlay = document.createElement('td');
         if (row.play_id != null && typeof window.buildPlayDetailLink === 'function') {
           tdPlay.appendChild(window.buildPlayDetailLink(row.play_title, row.play_id));
-          tdPlay.classList.add('book-cell');
         } else {
           tdPlay.textContent = row.play_title ?? '';
-          tdPlay.classList.add('book-cell');
         }
 
         const tdAct = document.createElement('td');
@@ -259,7 +257,6 @@
         tdText.innerHTML = (getColorScaleState().highlightEnabled && row.highlightRegex)
           ? window.highlightHTML(row.text, row.highlightRegex)
           : window.escapeHTML(row.text);
-        tdText.classList.add('hebrew');
 
         tr.appendChild(tdPlay);
         tr.appendChild(tdAct);
@@ -274,14 +271,13 @@
         setElementHidden(els.pagination, filtered.length <= 25);
       }
       if (els.pageInfo) els.pageInfo.textContent = `Page ${state.currentPage} of ${totalPages}`;
-      if (els.totalInfo) els.totalInfo.textContent = `(${filtered.length} total verses)`;
+      if (els.totalInfo) els.totalInfo.textContent = `(${filtered.length} total paragraphs)`;
       if (els.firstPage) els.firstPage.disabled = state.currentPage === 1;
       if (els.prevPage) els.prevPage.disabled = state.currentPage === 1;
       if (els.nextPage) els.nextPage.disabled = state.currentPage === totalPages;
       if (els.lastPage) els.lastPage.disabled = state.currentPage === totalPages;
 
       callApplyOrClear();
-      if (typeof window.applyHebrewClasses === 'function') window.applyHebrewClasses(els.resultsTable);
       callUpdateDeepLink();
       updateFilterActions();
     }
@@ -289,10 +285,10 @@
     function setHeaders() {
       if (!els.headRow) return;
       const cols = [
-        { key: 'play_title', label: 'Book', defaultDir: 'asc', type: 'text' },
+        { key: 'play_title', label: 'Work', defaultDir: 'asc', type: 'text' },
         { key: 'act', label: 'Chapter', type: 'number' },
-        { key: 'scene', label: 'Verse', type: 'number' },
-        { key: 'text', label: 'Verse Text', defaultDir: 'asc', type: 'text' }
+        { key: 'scene', label: 'Paragraph', type: 'number' },
+        { key: 'text', label: 'Paragraph Text', defaultDir: 'asc', type: 'text' }
       ];
 
       els.headRow.innerHTML = '';
@@ -346,14 +342,14 @@
 
       const rows = buildLinesRows(query);
       if (!rows) {
-        els.tableBody.innerHTML = '<tr><td colspan="4" class="warning">Invalid search or no verse data available.</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="4" class="warning">Invalid search or no paragraph data available.</td></tr>';
         setElementHidden(els.pagination, true);
         updateFilterActions();
         return;
       }
 
       if (rows.length === 0) {
-        els.tableBody.innerHTML = '<tr><td colspan="4" class="muted">No verses matched.</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="4" class="muted">No paragraphs matched.</td></tr>';
         setElementHidden(els.pagination, true);
         updateFilterActions();
         return;
@@ -484,7 +480,7 @@
 
         if (els.downloadCsv) {
         els.downloadCsv.addEventListener('click', () => {
-          const name = `verses-${Date.now()}.csv`;
+          const name = `paragraphs-${Date.now()}.csv`;
           downloadCsvAll(name);
         });
       }

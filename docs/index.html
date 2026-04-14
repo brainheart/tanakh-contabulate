@@ -15,6 +15,12 @@
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
+  <div id="loadingIndicator" class="loading-indicator" role="status" aria-live="polite">
+    <div class="loading-indicator-card">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <p id="loadingMessage" class="loading-message">Loading data...</p>
+    </div>
+  </div>
   <h1><a href="https://contabulate.org/">Contabulate</a>: 🕎 <span class="hebrew-inline" dir="rtl">תנ״ך</span> — Hebrew Bible Tabular Search</h1>
   <p class="muted">Search Hebrew words, bigrams, or trigrams across sections, books, chapters, verses, and verse text. Exact matching ignores nikud for lookup but preserves pointed text in the results. Source text courtesy of <a href="https://github.com/openscriptures/morphhb" target="_blank" rel="noopener">Open Scriptures morphhb</a> and the Westminster Leningrad Codex.</p>
 
@@ -644,6 +650,18 @@
     });
   });
 
+  const loadingIndicator = document.getElementById('loadingIndicator');
+  const loadingMessage = document.getElementById('loadingMessage');
+
+  function setLoadingState(isLoading, message) {
+    if (loadingMessage && typeof message === 'string' && message) {
+      loadingMessage.textContent = message;
+    }
+    if (loadingIndicator) {
+      loadingIndicator.classList.toggle('is-hidden', !isLoading);
+    }
+  }
+
   async function loadJSON(path) {
     const res = await fetch(path);
     if (!res.ok) throw new Error(`Failed to load ${path}: ${res.status}`);
@@ -651,6 +669,7 @@
   }
 
   let chunks=[], tokens={}, tokens2={}, tokens3={}, plays=[], characters=[], tokensChar={}, tokensChar2={}, tokensChar3={}, allLines=[], characterNameFilterConfig=null;
+  setLoadingState(true, "Loading data...");
   try {
     [chunks, tokens, tokens2, tokens3, plays, characters, tokensChar, tokensChar2, tokensChar3, characterNameFilterConfig] = await Promise.all([
       loadJSON('data/chunks.json'),
@@ -1860,6 +1879,8 @@
     if (!linesTabController) return;
     linesTabController.doSearch();
   }
+
+  setLoadingState(false);
 
   // initial state for contexts tab (only if no deep link state applied)
   if (!appliedDeepLinkState) {

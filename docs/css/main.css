@@ -759,7 +759,7 @@ th { position: sticky; }
   }
 }
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 /* Loading indicator */

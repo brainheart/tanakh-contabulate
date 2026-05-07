@@ -9,6 +9,7 @@ The generated site lives in [docs](/Users/klaus/Projects/tanakh-contabulate/docs
 - Open Scriptures `morphhb`: https://github.com/openscriptures/morphhb
 - Westminster Leningrad Codex text contained in the `source_text/*.xml` OSIS files
 - Morphological markup is stripped down to plain Hebrew verse text for display; search indexes normalize Hebrew by removing nikud and cantillation marks
+- Commentary-interest counts are generated from Sefaria-Export Tanakh commentary data: https://github.com/Sefaria/Sefaria-Export
 
 ## Build
 
@@ -28,6 +29,7 @@ This parses all 39 Tanakh books in traditional order and writes:
 - `docs/data/tokens3.json`
 - `docs/data/tokens_char*.json`
 - `docs/data/character_name_filter_config.json`
+- `docs/data/commentary_interest.json`
 - `docs/lines/all_lines.json`
 
 ## Local Preview
@@ -58,4 +60,5 @@ npx playwright test
 
 - Search indexes are accent-insensitive for Hebrew matching.
 - Display text preserves pointed Hebrew and sof pasuq punctuation.
+- Commentary counts store only per-verse counts and commentator metadata, not commentary text.
 - The overall UI remains LTR, while Hebrew content cells and verse text render RTL.

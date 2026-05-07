@@ -46,6 +46,7 @@
 
     let initialized = false;
     let debouncedDoSearch = null;
+    let searchRequestId = 0;
 
     function callUpdateDeepLink() {
       if (typeof deps.updateDeepLink === 'function') deps.updateDeepLink();
@@ -77,6 +78,16 @@
     function getAllLinesData() {
       if (typeof deps.getAllLines === 'function') return deps.getAllLines() || [];
       return Array.isArray(deps.allLines) ? deps.allLines : [];
+    }
+
+    async function ensureLineDataLoaded() {
+      if (typeof deps.ensureAllLinesLoaded !== 'function') return true;
+      try {
+        await deps.ensureAllLinesLoaded({ showOverlay: true });
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
     function getPlaysById() {
@@ -146,6 +157,7 @@
             play_id: line.play_id,
             act: line.act,
             scene: line.scene,
+            commentary_interest: Number(line.commentary_interest) || 0,
             line_num: line.line_num,
             text: rawText,
             highlightRegex
@@ -252,6 +264,9 @@
         const tdScene = document.createElement('td');
         tdScene.textContent = sceneVal;
 
+        const tdInterest = document.createElement('td');
+        tdInterest.textContent = row.commentary_interest ?? 0;
+
         const tdText = document.createElement('td');
         tdText.className = 'line-text';
         tdText.innerHTML = (getColorScaleState().highlightEnabled && row.highlightRegex)
@@ -261,6 +276,7 @@
         tr.appendChild(tdPlay);
         tr.appendChild(tdAct);
         tr.appendChild(tdScene);
+        tr.appendChild(tdInterest);
         tr.appendChild(tdText);
         els.tableBody.appendChild(tr);
       }
@@ -271,7 +287,7 @@
         setElementHidden(els.pagination, filtered.length <= 25);
       }
       if (els.pageInfo) els.pageInfo.textContent = `Page ${state.currentPage} of ${totalPages}`;
-      if (els.totalInfo) els.totalInfo.textContent = `(${filtered.length} total paragraphs)`;
+      if (els.totalInfo) els.totalInfo.textContent = `(${filtered.length} total verses)`;
       if (els.firstPage) els.firstPage.disabled = state.currentPage === 1;
       if (els.prevPage) els.prevPage.disabled = state.currentPage === 1;
       if (els.nextPage) els.nextPage.disabled = state.currentPage === totalPages;
@@ -285,10 +301,11 @@
     function setHeaders() {
       if (!els.headRow) return;
       const cols = [
-        { key: 'play_title', label: 'Work', defaultDir: 'asc', type: 'text' },
+        { key: 'play_title', label: 'Book', defaultDir: 'asc', type: 'text' },
         { key: 'act', label: 'Chapter', type: 'number' },
-        { key: 'scene', label: 'Paragraph', type: 'number' },
-        { key: 'text', label: 'Paragraph Text', defaultDir: 'asc', type: 'text' }
+        { key: 'scene', label: 'Verse', type: 'number' },
+        { key: 'commentary_interest', label: '# comments', type: 'number' },
+        { key: 'text', label: 'Verse Text', defaultDir: 'asc', type: 'text' }
       ];
 
       els.headRow.innerHTML = '';
@@ -330,7 +347,8 @@
       updateSortIndicators();
     }
 
-    function doSearch() {
+    async function doSearch() {
+      const requestId = ++searchRequestId;
       if (!els.query || !els.tableBody || !els.pagination) return;
       const query = els.query.value.trim();
       if (!query) {
@@ -340,16 +358,29 @@
         return;
       }
 
+      if (getAllLinesData().length === 0) {
+        els.tableBody.innerHTML = '<tr><td colspan="5" class="muted">Loading verse data...</td></tr>';
+        setElementHidden(els.pagination, true);
+        const loaded = await ensureLineDataLoaded();
+        if (requestId !== searchRequestId) return;
+        if (!loaded) {
+          els.tableBody.innerHTML = '<tr><td colspan="5" class="warning">Verse data not available.</td></tr>';
+          setElementHidden(els.pagination, true);
+          updateFilterActions();
+          return;
+        }
+      }
+
       const rows = buildLinesRows(query);
       if (!rows) {
-        els.tableBody.innerHTML = '<tr><td colspan="4" class="warning">Invalid search or no paragraph data available.</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="5" class="warning">Invalid search or no verse data available.</td></tr>';
         setElementHidden(els.pagination, true);
         updateFilterActions();
         return;
       }
 
       if (rows.length === 0) {
-        els.tableBody.innerHTML = '<tr><td colspan="4" class="muted">No paragraphs matched.</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="5" class="muted">No verses matched.</td></tr>';
         setElementHidden(els.pagination, true);
         updateFilterActions();
         return;
@@ -480,7 +511,7 @@
 
         if (els.downloadCsv) {
         els.downloadCsv.addEventListener('click', () => {
-          const name = `paragraphs-${Date.now()}.csv`;
+          const name = `verses-${Date.now()}.csv`;
           downloadCsvAll(name);
         });
       }

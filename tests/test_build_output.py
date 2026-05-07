@@ -26,6 +26,7 @@ def test_expected_output_files_exist_and_are_nonempty():
         DATA / "tokens_char2.json",
         DATA / "tokens_char3.json",
         DATA / "character_name_filter_config.json",
+        DATA / "commentary_interest.json",
         LINES / "all_lines.json",
     ]
     for path in expected:
@@ -46,8 +47,21 @@ def test_chunks_and_lines_contain_hebrew_text():
     lines = load_json(LINES / "all_lines.json")
     assert len(chunks) == len(lines) == 23213
     assert chunks[0]["canonical_id"] == "Gen.1.1"
+    assert chunks[0]["commentary_interest"] > 300
+    assert chunks[0]["commentary_rashi"] == 3
     assert HEBREW_RE.search(lines[0]["text"])
     assert "׃" in lines[0]["text"]
+    assert lines[0]["commentary_interest"] == chunks[0]["commentary_interest"]
+
+
+def test_commentary_summary_and_book_totals():
+    commentary = load_json(DATA / "commentary_interest.json")
+    plays = load_json(DATA / "plays.json")
+
+    assert commentary["metadata"]["source_id"] == "sefaria_tanakh_commentaries"
+    assert len(commentary["metadata"]["commentators"]) >= 70
+    assert commentary["summary"]["total_interest"] > 300000
+    assert plays[0]["commentary_interest"] > 40000
 
 
 def test_token_indexes_include_common_hebrew_terms():

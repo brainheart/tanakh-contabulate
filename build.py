@@ -14,6 +14,7 @@ HEBREW_TOKEN_RE = re.compile(r"[\u05D0-\u05EA]+(?:[\u05F3\u05F4'\"]?[\u05D0-\u05
 STRIP_POINTS_RE = re.compile(r"[\u0591-\u05BD\u05BF-\u05C7]")
 SLASH_RE = re.compile(r"/+")
 WHITESPACE_RE = re.compile(r"\s+")
+COMMENTARY_INTEREST_SOURCE = "sefaria_tanakh_commentary_interest.json"
 
 BOOK_ORDER = [
     ("Torah", "תורה", "Gen", "בראשית", "Genesis"),
@@ -180,10 +181,65 @@ def write_json(path: Path, payload) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+def load_commentary_interest(project_root: Path):
+    source_path = project_root / "commentary" / COMMENTARY_INTEREST_SOURCE
+    if not source_path.exists():
+        return {"metadata": {"commentators": []}, "summary": {}, "verses": {}}
+    payload = json.loads(source_path.read_text(encoding="utf-8"))
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    verses = payload.get("verses") if isinstance(payload.get("verses"), dict) else {}
+    return {"metadata": metadata, "summary": summary, "verses": verses}
+
+
+def get_commentary_columns(metadata):
+    columns = []
+    for item in metadata.get("commentators", []):
+        key = normalize_display_ws(str(item.get("key", "")))
+        if not key:
+            continue
+        columns.append(
+            {
+                "key": key,
+                "name": normalize_display_ws(str(item.get("name", key))),
+                "label": normalize_display_ws(str(item.get("label", item.get("name", key)))),
+            }
+        )
+    return columns
+
+
+def empty_commentary_fields(commentary_columns):
+    return {"commentary_interest": 0}
+
+
+def commentary_fields_for(canonical_id, commentary_verses, commentary_columns):
+    fields = empty_commentary_fields(commentary_columns)
+    item = commentary_verses.get(canonical_id) or {}
+    try:
+        fields["commentary_interest"] = int(item.get("total") or 0)
+    except (TypeError, ValueError):
+        fields["commentary_interest"] = 0
+    by_commentator = item.get("by_commentator") if isinstance(item.get("by_commentator"), dict) else {}
+    for column in commentary_columns:
+        try:
+            count = int(by_commentator.get(column["key"]) or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count:
+            fields[f"commentary_{column['key']}"] = count
+    return fields
+
+
 def build(source_dir: Path, out_dir: Path) -> None:
     clean_output_dir(out_dir)
     data_dir = out_dir / "data"
     lines_dir = out_dir / "lines"
+    project_root = source_dir.parent
+    commentary_interest = load_commentary_interest(project_root)
+    commentary_metadata = commentary_interest["metadata"]
+    commentary_summary = commentary_interest["summary"]
+    commentary_verses = commentary_interest["verses"]
+    commentary_columns = get_commentary_columns(commentary_metadata)
 
     plays = []
     characters = []
@@ -204,6 +260,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
 
         verses = parse_book(xml_path)
         book_total_words = 0
+        book_commentary_fields = empty_commentary_fields(commentary_columns)
         chapter_numbers = sorted({verse["chapter"] for verse in verses})
 
         for verse in verses:
@@ -218,39 +275,44 @@ def build(source_dir: Path, out_dir: Path) -> None:
 
             heading = f"{meta['title_he']} {verse['chapter']}:{verse['verse']} ({meta['title_en']})"
             location = format_location(section_id, book_id, abbr, verse["chapter"], verse["verse"])
-
-            chunks.append(
-                {
-                    "scene_id": verse_id,
-                    "canonical_id": verse["canonical_id"],
-                    "location": location,
-                    "play_id": book_id,
-                    "play_title": meta["display_title"],
-                    "play_abbr": abbr,
-                    "genre": meta["section_he"],
-                    "act": verse["chapter"],
-                    "scene": verse["verse"],
-                    "heading": heading,
-                    "total_words": total_words,
-                    "unique_words": unique_words,
-                    "num_speeches": 0,
-                    "num_lines": 1,
-                    "characters_present_count": 0,
-                }
+            verse_commentary_fields = commentary_fields_for(
+                verse["canonical_id"], commentary_verses, commentary_columns
             )
+            for key, value in verse_commentary_fields.items():
+                book_commentary_fields[key] = book_commentary_fields.get(key, 0) + value
 
-            all_lines.append(
-                {
-                    "play_id": book_id,
-                    "canonical_id": verse["canonical_id"],
-                    "location": location,
-                    "act": verse["chapter"],
-                    "scene": verse["verse"],
-                    "line_num": verse_id,
-                    "speaker": "",
-                    "text": verse["text"],
-                }
-            )
+            chunk_row = {
+                "scene_id": verse_id,
+                "canonical_id": verse["canonical_id"],
+                "location": location,
+                "play_id": book_id,
+                "play_title": meta["display_title"],
+                "play_abbr": abbr,
+                "genre": meta["section_he"],
+                "act": verse["chapter"],
+                "scene": verse["verse"],
+                "heading": heading,
+                "total_words": total_words,
+                "unique_words": unique_words,
+                "num_speeches": 0,
+                "num_lines": 1,
+                "characters_present_count": 0,
+            }
+            chunk_row.update(verse_commentary_fields)
+            chunks.append(chunk_row)
+
+            line_row = {
+                "play_id": book_id,
+                "canonical_id": verse["canonical_id"],
+                "location": location,
+                "act": verse["chapter"],
+                "scene": verse["verse"],
+                "line_num": verse_id,
+                "speaker": "",
+                "text": verse["text"],
+            }
+            line_row.update(verse_commentary_fields)
+            all_lines.append(line_row)
 
             verse_unigrams = defaultdict(int)
             verse_bigrams = defaultdict(int)
@@ -272,21 +334,21 @@ def build(source_dir: Path, out_dir: Path) -> None:
             for term, count in verse_trigrams.items():
                 tokens3[term].append([verse_id, count])
 
-        plays.append(
-            {
-                "play_id": book_id,
-                "location": format_location(section_id, book_id, abbr),
-                "title": meta["display_title"],
-                "abbr": abbr,
-                "genre": meta["section_he"],
-                "first_performance_year": None,
-                "num_acts": len(chapter_numbers),
-                "num_scenes": len(verses),
-                "num_speeches": 0,
-                "total_words": book_total_words,
-                "total_lines": len(verses),
-            }
-        )
+        book_row = {
+            "play_id": book_id,
+            "location": format_location(section_id, book_id, abbr),
+            "title": meta["display_title"],
+            "abbr": abbr,
+            "genre": meta["section_he"],
+            "first_performance_year": None,
+            "num_acts": len(chapter_numbers),
+            "num_scenes": len(verses),
+            "num_speeches": 0,
+            "total_words": book_total_words,
+            "total_lines": len(verses),
+        }
+        book_row.update(book_commentary_fields)
+        plays.append(book_row)
 
     write_json(data_dir / "plays.json", plays)
     write_json(data_dir / "characters.json", characters)
@@ -294,6 +356,16 @@ def build(source_dir: Path, out_dir: Path) -> None:
     write_json(data_dir / "tokens.json", dict(tokens))
     write_json(data_dir / "tokens2.json", dict(tokens2))
     write_json(data_dir / "tokens3.json", dict(tokens3))
+    write_json(
+        data_dir / "commentary_interest.json",
+        {
+            "metadata": commentary_metadata,
+            "summary": {
+                **commentary_summary,
+                "source_file": COMMENTARY_INTEREST_SOURCE,
+            },
+        },
+    )
     write_json(data_dir / "tokens_char.json", {})
     write_json(data_dir / "tokens_char2.json", {})
     write_json(data_dir / "tokens_char3.json", {})

@@ -303,9 +303,9 @@
       const cols = [
         { key: 'play_title', label: 'Book', defaultDir: 'asc', type: 'text' },
         { key: 'act', label: 'Chapter', type: 'number' },
-        { key: 'scene', label: 'Verse', type: 'number' },
+        { key: 'scene', label: 'Verse #', type: 'number' },
         { key: 'commentary_interest', label: '# comments', type: 'number' },
-        { key: 'text', label: 'Verse Text', defaultDir: 'asc', type: 'text' }
+        { key: 'text', label: 'Verse', defaultDir: 'asc', type: 'text' }
       ];
 
       els.headRow.innerHTML = '';

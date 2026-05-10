@@ -43,8 +43,7 @@
           <option value="genre">Section</option>
           <option value="play">Book</option>
           <option value="act">Chapter</option>
-          <option value="scene">Verse</option>
-          <option value="line" selected>Verse Text</option>
+          <option value="line" selected>Verse</option>
         </select>
         <span class="label-strong">matching</span>
         <select id="matchMode" class="control-select">
@@ -514,10 +513,18 @@
   let segmentsColumnOrder = [];
   let segmentsColumnDefs = [];
   // Column filters maps (declare early for deep-link)
-  // Scope segments filters by current granularity (play/genre/act/scene/line/character)
+  // Scope segments filters by current granularity (play/genre/act/line/character)
   const segmentsFiltersByGran = new Map(); // gran -> Map(columnKey -> filter)
+  function normalizeGranularity(value) {
+    if (value === 'verse' || value === 'line' || value === 'scene') return 'line';
+    return ['genre', 'play', 'act', 'character'].includes(value) ? value : 'line';
+  }
+  function granularityToURL(value) {
+    const normalized = normalizeGranularity(value);
+    return normalized === 'line' ? 'verse' : normalized;
+  }
   function getSegmentsFiltersMap() {
-    const g = (typeof gran !== 'undefined' && gran && gran.value) ? gran.value : 'scene';
+    const g = normalizeGranularity(typeof gran !== 'undefined' && gran ? gran.value : 'line');
     if (!segmentsFiltersByGran.has(g)) segmentsFiltersByGran.set(g, new Map());
     return segmentsFiltersByGran.get(g);
   }
@@ -545,7 +552,7 @@
     const segTermState = getActiveTermsStateParts();
     p.set('q', segTermState.primary ? segTermState.primary.text : '');
     p.set('nm', ngramMode.value);
-    p.set('gran', gran.value);
+    p.set('gran', granularityToURL(gran.value));
     p.set('mm', matchMode.value);
     const allTermSpecs = [segTermState.primary, ...segTermState.extras].filter(Boolean);
     const extras = segTermState.extras.map(t => (t && t.text ? t.text.trim() : '')).filter(Boolean);
@@ -979,7 +986,7 @@
   (function applyStateFromURL(){
     const sp = new URLSearchParams(location.search);
     // New readable params first
-    if (sp.has('tab') || sp.has('q') || sp.has('ts') || sp.has('l_q') || sp.has('co')) {
+    if (sp.has('tab') || sp.has('q') || sp.has('ts') || sp.has('l_q') || sp.has('gran') || sp.has('co')) {
       appliedDeepLinkState = true;
       try {
         // Display
@@ -992,7 +999,7 @@
         if (sp.has('q')) q.value = sp.get('q');
         else if (sp.has('ts')) q.value = '';
         if (sp.has('nm')) ngramMode.value = sp.get('nm');
-        if (sp.has('gran')) gran.value = sp.get('gran');
+        if (sp.has('gran')) gran.value = normalizeGranularity(sp.get('gran'));
         if (sp.has('mm')) matchMode.value = sp.get('mm');
         if (sp.has('zr')) {
           showZeroRows = sp.get('zr') === '1';
@@ -1055,7 +1062,7 @@
       if (st.segments) {
       if (st.segments.q != null) q.value = st.segments.q;
       if (st.segments.ngramMode) ngramMode.value = st.segments.ngramMode;
-      if (st.segments.gran) gran.value = st.segments.gran;
+      if (st.segments.gran) gran.value = normalizeGranularity(st.segments.gran);
       if (st.segments.matchMode) matchMode.value = st.segments.matchMode;
       if (typeof st.segments.showZeroRows === 'boolean') {
         showZeroRows = st.segments.showZeroRows;
@@ -1620,12 +1627,12 @@
         { key: 'location', label: 'Location', defaultDir: 'asc', type: 'text' },
         { key: 'play_title', label: 'Book', defaultDir: 'asc', type: 'text' },
         { key: 'act', label: 'Chapter', type: 'number' },
-        { key: 'scene', label: 'Verse', type: 'number' }
+        { key: 'scene', label: 'Verse #', type: 'number' }
       ];
       const termCols = buildTermColumns();
       baseCols.push(...getCommentaryColumns());
       baseCols.push(...termCols);
-      baseCols.push({ key: 'line', label: 'Verse Text', type: 'text' });
+      baseCols.push({ key: 'line', label: 'Verse', type: 'text' });
       setHeaders(baseCols);
       if (!applyPreferredTermSort(termCols, preferredSortTermIndex)) {
         const defaultSortKey = termCols[0]?.key || 'location';
@@ -2185,7 +2192,7 @@
   const downloadSegBtn = document.getElementById('downloadSegmentsCsv');
   if (downloadSegBtn) {
     downloadSegBtn.addEventListener('click', () => {
-      const name = `segments-${gran.value}-${Date.now()}.csv`;
+      const name = `segments-${granularityToURL(gran.value)}-${Date.now()}.csv`;
       downloadSegmentsCsvAll(name);
     });
   }

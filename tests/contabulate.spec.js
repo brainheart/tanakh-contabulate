@@ -5,7 +5,9 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await expect(page).toHaveTitle(/Contabulate: תנ״ך/);
   await page.waitForFunction(() => window.__contabulateReady === true);
   const baseHeaders = await page.locator('#results thead th').allTextContents();
+  expect(baseHeaders.some((text) => text.includes('# verses'))).toBeTruthy();
   expect(baseHeaders.some((text) => text.includes('# comments'))).toBeTruthy();
+  expect(baseHeaders.some((text) => text.includes('Comments / verse'))).toBeTruthy();
   const options = await page.locator('#gran option').evaluateAll((opts) =>
     opts.map((opt) => ({ value: opt.value, text: (opt.textContent || '').trim() }))
   );

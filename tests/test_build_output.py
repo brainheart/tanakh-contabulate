@@ -40,6 +40,7 @@ def test_book_and_section_structure_matches_tanakh():
     assert plays[0]["title"].startswith("בראשית")
     assert plays[-1]["title"].startswith("דברי הימים ב")
     assert {play["genre"] for play in plays} == {"תורה", "נביאים", "כתובים"}
+    assert all(play["verse_count"] == play["total_lines"] for play in plays)
 
 
 def test_chunks_and_lines_contain_hebrew_text():
@@ -47,6 +48,7 @@ def test_chunks_and_lines_contain_hebrew_text():
     lines = load_json(LINES / "all_lines.json")
     assert len(chunks) == len(lines) == 23213
     assert chunks[0]["canonical_id"] == "Gen.1.1"
+    assert chunks[0]["verse_count"] == 1
     assert chunks[0]["commentary_interest"] > 300
     assert chunks[0]["commentary_rashi"] == 3
     assert HEBREW_RE.search(lines[0]["text"])

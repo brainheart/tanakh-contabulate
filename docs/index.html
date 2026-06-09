@@ -945,6 +945,18 @@
   }
   function addCommentaryFields(target, source, includeIndividuals = true) {
     Object.assign(target, copyCommentaryFields(source, includeIndividuals));
+    return addCommentaryDensity(target);
+  }
+  function getVerseCountValue(row) {
+    const value = Number(row && (row.verse_count ?? row.num_lines));
+    return Number.isFinite(value) ? value : 0;
+  }
+  function addCommentaryDensity(target) {
+    const verseCount = getVerseCountValue(target);
+    const comments = Number(target && target.commentary_interest);
+    target.commentary_per_verse = verseCount > 0 && Number.isFinite(comments)
+      ? Math.round((comments / verseCount) * 100) / 100
+      : 0;
     return target;
   }
   function getCommentaryColumns() {
@@ -956,22 +968,33 @@
     });
     return cols;
   }
+  function getVerseNormalizedCommentaryColumns() {
+    const cols = getCommentaryColumns();
+    cols.splice(1, 0, { key: 'commentary_per_verse', label: 'Comments / verse', type: 'number', defaultDir: 'desc' });
+    return cols;
+  }
   syncCommentatorColumnControls();
 
   // Precompute act/play totals (must be before applyStateFromURL which may call doSearch→denomFor)
   const actTotals = new Map();
   const playTotals = new Map();
+  const actVerseCounts = new Map();
+  const genreVerseCounts = new Map();
   const actCommentaryTotals = new Map();
   const genreCommentaryTotals = new Map();
   for (const r of chunks) {
     const k = `${r.play_id}:${r.act}`;
+    const verseCount = getVerseCountValue(r) || 1;
     actTotals.set(k, (actTotals.get(k)||0) + (r.total_words||0));
     playTotals.set(r.play_id, (playTotals.get(r.play_id)||0) + (r.total_words||0));
+    actVerseCounts.set(k, (actVerseCounts.get(k)||0) + verseCount);
     const actCommentary = actCommentaryTotals.get(k) || {};
     getCommentaryFieldKeys('all').forEach(key => {
       actCommentary[key] = (actCommentary[key] || 0) + (Number(r[key]) || 0);
     });
     actCommentaryTotals.set(k, actCommentary);
+    const genre = r.genre || 'unknown';
+    genreVerseCounts.set(genre, (genreVerseCounts.get(genre)||0) + verseCount);
   }
   for (const play of plays) {
     const genre = play.genre || 'unknown';
@@ -1521,7 +1544,7 @@
           if (!play) continue;
           ensureRow(k, () => {
             const ngramCount = getRowNgramCount(total_words);
-            return addCommentaryFields({ id: `${play.abbr}.${actNum}`, location:getChapterLocation(play, actNum), play_title: play.title, genre:play.genre, play_id:pid, act:actNum, total_words, ngram_count:ngramCount }, actCommentaryTotals.get(k));
+            return addCommentaryFields({ id: `${play.abbr}.${actNum}`, location:getChapterLocation(play, actNum), play_title: play.title, genre:play.genre, play_id:pid, act:actNum, verse_count: actVerseCounts.get(k) || 0, total_words, ngram_count:ngramCount }, actCommentaryTotals.get(k));
           });
         }
       } else if (granVal === 'play') {
@@ -1529,14 +1552,15 @@
           ensureRow(p.play_id, () => {
             const total_words = p.total_words ?? 0;
             const ngramCount = getRowNgramCount(total_words);
-            return addCommentaryFields({ play_id:p.play_id, location:getBookLocation(p), title:p.title, genre:p.genre, num_chapters:p.num_acts ?? 0, num_lines:p.total_lines ?? 0, total_words, ngram_count:ngramCount }, p);
+            const verseCount = p.verse_count ?? p.total_lines ?? p.num_lines ?? 0;
+            return addCommentaryFields({ play_id:p.play_id, location:getBookLocation(p), title:p.title, genre:p.genre, num_chapters:p.num_acts ?? 0, verse_count: verseCount, num_lines: verseCount, total_words, ngram_count:ngramCount }, p);
           });
         });
       } else if (granVal === 'genre') {
         for (const [genre, totalWords] of genreTotals.entries()) {
           ensureRow(genre, () => {
             const ngramCount = getRowNgramCount(totalWords);
-            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
+            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
           });
         }
       } else if (granVal === 'character') {
@@ -1681,7 +1705,8 @@
         {key:'location', label:'Location', defaultDir:'asc', type:'text'},
         {key:'play_title', label:'Book', defaultDir:'asc', type:'text'},
         {key:'act', label:'Chapter', type:'number'},
-        ...getCommentaryColumns(),
+        {key:'verse_count', label:'# verses', type:'number'},
+        ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
       activeTerms.forEach((term, termIdx) => {
@@ -1701,7 +1726,7 @@
           const row = ensureRow(k, () => {
             const total_words = actTotals.get(k) || 0;
             const ngramCount = getRowNgramCount(total_words);
-            return addCommentaryFields({ id: `${play.abbr}.${actNum}`, location:getChapterLocation(play, actNum), play_title: play.title, genre:play.genre, play_id:pid, act:actNum, total_words, ngram_count:ngramCount }, actCommentaryTotals.get(k));
+            return addCommentaryFields({ id: `${play.abbr}.${actNum}`, location:getChapterLocation(play, actNum), play_title: play.title, genre:play.genre, play_id:pid, act:actNum, verse_count: actVerseCounts.get(k) || 0, total_words, ngram_count:ngramCount }, actCommentaryTotals.get(k));
           });
           const d = denomFor(normalizeTermN(term.n) || 1,'act',{play_id:pid,act:actNum});
           row[`${termKeys[termIdx]}_count`] = count;
@@ -1724,8 +1749,8 @@
         {key:'title', label:'Book', defaultDir:'asc', type:'text'},
         {key:'genre', label:'Section', defaultDir:'asc', type:'text'},
         {key:'num_chapters', label:'# chapters', type:'number'},
-        {key:'num_lines', label:'# verses', type:'number'},
-        ...getCommentaryColumns(),
+        {key:'verse_count', label:'# verses', type:'number'},
+        ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
       activeTerms.forEach((term, termIdx) => {
@@ -1741,7 +1766,8 @@
           const row = ensureRow(pid, () => {
             const total_words = p.total_words ?? 0;
             const ngramCount = getRowNgramCount(total_words);
-            return addCommentaryFields({ play_id:pid, location:getBookLocation(p), title:p.title, genre:p.genre, num_chapters:p.num_acts ?? 0, num_lines:p.total_lines ?? 0, total_words, ngram_count:ngramCount }, p);
+            const verseCount = p.verse_count ?? p.total_lines ?? p.num_lines ?? 0;
+            return addCommentaryFields({ play_id:pid, location:getBookLocation(p), title:p.title, genre:p.genre, num_chapters:p.num_acts ?? 0, verse_count: verseCount, num_lines: verseCount, total_words, ngram_count:ngramCount }, p);
           });
           const d = denomFor(normalizeTermN(term.n) || 1,'play',{play_id:pid});
           row[`${termKeys[termIdx]}_count`] = count;
@@ -1762,7 +1788,8 @@
       const baseCols = [
         {key:'genre', label:'Section', defaultDir:'asc', type:'text'},
         {key:'num_plays', label:'# books', type:'number'},
-        ...getCommentaryColumns(),
+        {key:'verse_count', label:'# verses', type:'number'},
+        ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
       activeTerms.forEach((term, termIdx) => {
@@ -1777,7 +1804,7 @@
           const totalWords = genreTotals.get(genre) || 0;
           const row = ensureRow(genre, () => {
             const ngramCount = getRowNgramCount(totalWords);
-            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
+            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
           });
           const denom = denomFor(normalizeTermN(term.n) || 1, 'genre', { total_words: totalWords });
           row[`${termKeys[termIdx]}_count`] = count;

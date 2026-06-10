@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import shutil
 import unicodedata
@@ -15,6 +16,7 @@ STRIP_POINTS_RE = re.compile(r"[\u0591-\u05BD\u05BF-\u05C7]")
 SLASH_RE = re.compile(r"/+")
 WHITESPACE_RE = re.compile(r"\s+")
 COMMENTARY_INTEREST_SOURCE = "sefaria_tanakh_commentary_interest.json"
+SENT_RE = re.compile(r"[׃.!?]+")  # sof pasuq or western terminators
 
 BOOK_ORDER = [
     ("Torah", "תורה", "Gen", "בראשית", "Genesis"),
@@ -103,6 +105,23 @@ def normalize_search_text(text: str) -> str:
 def tokenize_hebrew(text: str) -> list[str]:
     normalized = normalize_search_text(text)
     return [match.group(0) for match in HEBREW_TOKEN_RE.finditer(normalized)]
+
+
+def count_sentences(text):
+    return len(SENT_RE.findall(text or ""))
+
+
+def mattr(tokens, window=50):
+    """Moving-average type-token ratio: lexical diversity comparable across lengths."""
+    if not tokens:
+        return 0.0
+    if len(tokens) < window:
+        return len(set(tokens)) / len(tokens)
+    ratios = [
+        len(set(tokens[i:i + window])) / window
+        for i in range(len(tokens) - window + 1)
+    ]
+    return sum(ratios) / len(ratios)
 
 
 def extract_word_text(word_elem: ET.Element) -> str:
@@ -260,6 +279,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
 
         verses = parse_book(xml_path)
         book_total_words = 0
+        book_tokens = []  # ordered token stream for book-level MATTR
         book_commentary_fields = empty_commentary_fields(commentary_columns)
         chapter_numbers = sorted({verse["chapter"] for verse in verses})
 
@@ -272,6 +292,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
             total_words = len(verse_tokens)
             unique_words = len(set(verse_tokens))
             book_total_words += total_words
+            book_tokens.extend(verse_tokens)
 
             heading = f"{meta['title_he']} {verse['chapter']}:{verse['verse']} ({meta['title_en']})"
             location = format_location(section_id, book_id, abbr, verse["chapter"], verse["verse"])
@@ -298,6 +319,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
                 "num_lines": 1,
                 "verse_count": 1,
                 "characters_present_count": 0,
+                "sentence_count": count_sentences(verse["text"]),
             }
             chunk_row.update(verse_commentary_fields)
             chunks.append(chunk_row)
@@ -348,9 +370,29 @@ def build(source_dir: Path, out_dir: Path) -> None:
             "total_words": book_total_words,
             "total_lines": len(verses),
             "verse_count": len(verses),
+            "mattr_50": round(mattr(book_tokens), 3),
         }
         book_row.update(book_commentary_fields)
         plays.append(book_row)
+
+    # Additive metric fields (char_count, rarity_sum) per verse. The UI derives
+    # ratio metrics (mean word length, lexical rarity) at any aggregation level
+    # by summing these and dividing by total words.
+    corpus_freq = {tok: sum(c for _, c in postings) for tok, postings in tokens.items()}
+    corpus_total = sum(corpus_freq.values()) or 1
+    tok_rarity = {tok: -math.log10(f / corpus_total) for tok, f in corpus_freq.items()}
+    verse_chars = {}
+    verse_rarity = {}
+    for tok, postings in tokens.items():
+        length = len(tok)
+        rarity = tok_rarity[tok]
+        for vid, count in postings:
+            verse_chars[vid] = verse_chars.get(vid, 0) + length * count
+            verse_rarity[vid] = verse_rarity.get(vid, 0.0) + rarity * count
+    for chunk_row in chunks:
+        vid = chunk_row["scene_id"]
+        chunk_row["char_count"] = verse_chars.get(vid, 0)
+        chunk_row["rarity_sum"] = round(verse_rarity.get(vid, 0.0), 3)
 
     write_json(data_dir / "plays.json", plays)
     write_json(data_dir / "characters.json", characters)

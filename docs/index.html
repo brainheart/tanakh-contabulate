@@ -90,6 +90,13 @@
           </label>
         </div>
       </div>
+      <div class="options-row">
+        <span class="label-strong">Extra columns:</span>
+        <label title="Average sentence length: words per sentence, with sentences split on sof pasuq (׃) — higher = longer, more complex sentences."><input type="checkbox" class="metric-col-toggle" data-metric="wps"> Words/Sentence</label>
+        <label title="Average word length in letters. Higher = longer words."><input type="checkbox" class="metric-col-toggle" data-metric="wlen"> Word Length</label>
+        <label title="How rare the vocabulary is: each word is scored by its rarity in the whole corpus (−log10 of its frequency share), averaged over the row's words. Higher = rarer vocabulary."><input type="checkbox" class="metric-col-toggle" data-metric="rare"> Lexical Rarity</label>
+        <label title="Vocabulary diversity (MATTR-50): type–token ratio averaged over a moving 50-word window, 0–1. Higher = more varied vocabulary; comparable across texts of different lengths. Available at Book level."><input type="checkbox" class="metric-col-toggle" data-metric="mattr"> Vocab Diversity</label>
+      </div>
       <div class="color-scale-legend"></div>
       <div class="deep-link-wrap">
         <strong>Deep Link:</strong>
@@ -231,6 +238,22 @@
   let addColumnPromptStepIndex = 0;
   let extraTerms = [];
   let showZeroRows = false;
+  // Optional metric columns (off by default; toggled in Options, persisted in deep links via `mc=`)
+  const METRIC_COL_DEFS = [
+    { code: 'wps', key: 'words_per_sentence', label: 'Words/Sentence', decimals: 1,
+      tooltip: 'Average sentence length: words per sentence, with sentences split on sof pasuq (׃) — higher = longer, more complex sentences.' },
+    { code: 'wlen', key: 'mean_word_length', label: 'Word Length', decimals: 2,
+      tooltip: 'Average word length in letters. Higher = longer words.' },
+    { code: 'rare', key: 'lexical_rarity', label: 'Lexical Rarity', decimals: 2,
+      tooltip: 'How rare the vocabulary is: each word is scored by its rarity in the whole corpus (−log10 of its frequency share), averaged over the row’s words. Higher = rarer vocabulary.' },
+    { code: 'mattr', key: 'mattr_50', label: 'Vocab Diversity', decimals: 3, granOnly: ['play'],
+      tooltip: 'Vocabulary diversity (MATTR-50): type–token ratio averaged over a moving 50-word window, 0–1. Higher = more varied vocabulary; comparable across texts of different lengths. Available at Book level.' },
+  ];
+  let enabledMetricCodes = [];
+  const metricToggles = Array.from(document.querySelectorAll('.metric-col-toggle'));
+  function syncMetricToggles() {
+    metricToggles.forEach(cb => { cb.checked = enabledMetricCodes.includes(cb.dataset.metric); });
+  }
   let selectedCommentatorColumns = new Set();
   let commentatorColumnFilterText = '';
   const resultsTable = document.getElementById('results');
@@ -548,6 +571,7 @@
     if (selectedCommentatorsParam) p.set('commentators', selectedCommentatorsParam);
     // palette and steps omitted for cleaner URLs
     p.set('hl', colorScaleState.highlightEnabled ? '1' : '0');
+    if (enabledMetricCodes.length) p.set('mc', enabledMetricCodes.join(','));
     // Segments
     const segTermState = getActiveTermsStateParts();
     p.set('q', segTermState.primary ? segTermState.primary.text : '');
@@ -1005,11 +1029,65 @@
     genreCommentaryTotals.set(genre, genreCommentary);
   }
 
+  // Aggregate the additive metric fields (sentence_count, char_count, rarity_sum)
+  // from verse chunks so metric columns can be derived at any granularity.
+  const metricAggs = { act: new Map(), play: new Map(), genre: new Map() };
+  function addMetricSums(map, k, r) {
+    let s = map.get(k);
+    if (!s) { s = { tw: 0, sc: 0, cc: 0, rs: 0 }; map.set(k, s); }
+    s.tw += r.total_words || 0; s.sc += r.sentence_count || 0;
+    s.cc += r.char_count || 0; s.rs += r.rarity_sum || 0;
+  }
+  for (const r of chunks) {
+    addMetricSums(metricAggs.act, `${r.play_id}:${r.act}`, r);
+    addMetricSums(metricAggs.play, r.play_id, r);
+    addMetricSums(metricAggs.genre, r.genre || 'unknown', r);
+  }
+  function metricSumsForRow(granVal, row) {
+    if (granVal === 'scene' || granVal === 'line') {
+      // verses are both chunks and lines here; line rows carry line_num === scene_id
+      const m = chunkById.get(granVal === 'scene' ? row.scene_id : row.line_num);
+      return m ? { tw: m.total_words||0, sc: m.sentence_count||0, cc: m.char_count||0, rs: m.rarity_sum||0 } : null;
+    }
+    if (granVal === 'act') return metricAggs.act.get(`${row.play_id}:${row.act}`) || null;
+    if (granVal === 'play') return metricAggs.play.get(row.play_id) || null;
+    if (granVal === 'genre') return metricAggs.genre.get(row.genre) || null;
+    return null;
+  }
+  function getEnabledMetricDefs(granVal) {
+    if (granVal === 'character') return [];
+    return METRIC_COL_DEFS.filter(d => enabledMetricCodes.includes(d.code)
+      && (!d.granOnly || d.granOnly.includes(granVal)));
+  }
+  function metricColsFor(granVal) {
+    return getEnabledMetricDefs(granVal).map(d => ({ key: d.key, label: d.label, type: 'number', tooltip: d.tooltip }));
+  }
+  function roundTo(v, dec) { const f = Math.pow(10, dec); return Math.round(v * f) / f; }
+  function attachMetricValues(rows, granVal) {
+    const defs = getEnabledMetricDefs(granVal);
+    if (!defs.length) return;
+    for (const row of rows) {
+      const s = metricSumsForRow(granVal, row);
+      for (const d of defs) {
+        let v = null;
+        if (d.key === 'mattr_50') {
+          const p = playsById.get(row.play_id);
+          v = (p && Number.isFinite(p.mattr_50)) ? p.mattr_50 : null;
+        } else if (s) {
+          if (d.key === 'words_per_sentence') v = s.sc > 0 ? roundTo(s.tw / s.sc, d.decimals) : null;
+          else if (d.key === 'mean_word_length') v = s.tw > 0 ? roundTo(s.cc / s.tw, d.decimals) : null;
+          else if (d.key === 'lexical_rarity') v = s.tw > 0 ? roundTo(s.rs / s.tw, d.decimals) : null;
+        }
+        row[d.key] = v;
+      }
+    }
+  }
+
   // Apply state from deep link if present
   (function applyStateFromURL(){
     const sp = new URLSearchParams(location.search);
     // New readable params first
-    if (sp.has('tab') || sp.has('q') || sp.has('ts') || sp.has('l_q') || sp.has('gran') || sp.has('co')) {
+    if (sp.has('tab') || sp.has('q') || sp.has('ts') || sp.has('l_q') || sp.has('gran') || sp.has('co') || sp.has('mc')) {
       appliedDeepLinkState = true;
       try {
         // Display
@@ -1027,6 +1105,11 @@
         if (sp.has('zr')) {
           showZeroRows = sp.get('zr') === '1';
           if (showZeroRowsToggle) showZeroRowsToggle.checked = showZeroRows;
+        }
+        if (sp.has('mc')) {
+          const codes = sp.get('mc').split(',').map(s2 => s2.trim());
+          enabledMetricCodes = METRIC_COL_DEFS.map(d => d.code).filter(c => codes.includes(c));
+          syncMetricToggles();
         }
         if (sp.has('commentators')) {
           setSelectedCommentatorKeys(decodeCommentatorsParam(sp.get('commentators')));
@@ -1178,7 +1261,7 @@
       th.dataset.label = c.label;
       th.dataset.key = c.key;
       th.dataset.type = c.type || 'text';
-      th.title = 'Click to sort';
+      th.title = c.tooltip ? `${c.tooltip} Click to sort.` : 'Click to sort';
       const labelSpan = document.createElement('span');
       labelSpan.className = 'th-label';
       labelSpan.textContent = c.label;
@@ -1479,6 +1562,7 @@
     }
     function finalizeRows() {
       const arr = Array.from(rowsMap.values());
+      attachMetricValues(arr, granVal);
       arr.forEach(r => {
         activeTerms.forEach((termSpec, idx) => {
           const tk = termKeys[idx];
@@ -1655,6 +1739,7 @@
       ];
       const termCols = buildTermColumns();
       baseCols.push(...getCommentaryColumns());
+      baseCols.push(...metricColsFor(granVal));
       baseCols.push(...termCols);
       baseCols.push({ key: 'line', label: 'Verse', type: 'text' });
       setHeaders(baseCols);
@@ -1675,6 +1760,7 @@
         ...getCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
+      baseCols.push(...metricColsFor(granVal));
       activeTerms.forEach((term, termIdx) => {
         const postings = getPostingsForTerm(termIdx);
         for (const [scene_id, count] of postings){
@@ -1709,6 +1795,7 @@
         ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
+      baseCols.push(...metricColsFor(granVal));
       activeTerms.forEach((term, termIdx) => {
         const postings = getPostingsForTerm(termIdx);
         const countsByAct = new Map();
@@ -1753,6 +1840,7 @@
         ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
+      baseCols.push(...metricColsFor(granVal));
       activeTerms.forEach((term, termIdx) => {
         const postings = getPostingsForTerm(termIdx);
         const countsByPlay = new Map();
@@ -1792,6 +1880,7 @@
         ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
       ];
+      baseCols.push(...metricColsFor(granVal));
       activeTerms.forEach((term, termIdx) => {
         const postings = getPostingsForTerm(termIdx);
         const countsByGenre = new Map();
@@ -2191,6 +2280,13 @@
       doSearch();
     });
   }
+  // Metric column toggles
+  metricToggles.forEach(cb => {
+    cb.addEventListener('change', () => {
+      enabledMetricCodes = metricToggles.filter(c => c.checked).map(c => c.dataset.metric);
+      doSearch();
+    });
+  });
   // Palette and steps options
   document.querySelectorAll('.color-scale-palette').forEach(sel => {
     sel.addEventListener('change', e => { colorScaleState.colorScalePalette = e.target.value; syncColorScaleOptions(); applyColorScalesForVisibleTables(); updateDeepLink(); });
@@ -2203,6 +2299,7 @@
   syncColorScaleOptions();
   renderAllLegends();
   if (showZeroRowsToggle) showZeroRowsToggle.checked = showZeroRows;
+  syncMetricToggles();
   updateSegmentsMatchModeUI();
   // Highlight toggle handlers
   document.querySelectorAll('.highlight-toggle').forEach(cb => {

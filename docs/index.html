@@ -96,6 +96,7 @@
       <div class="deep-link-wrap">
         <strong>Deep Link:</strong>
         <a class="deep-link" href="#" target="_blank" rel="noopener"></a>
+        <button type="button" class="copy-deep-link link-btn">Copy</button>
       </div>
     </details>
 
@@ -171,6 +172,7 @@
       <div class="deep-link-wrap">
         <strong>Deep Link:</strong>
         <a class="deep-link" href="#" target="_blank" rel="noopener"></a>
+        <button type="button" class="copy-deep-link link-btn">Copy</button>
       </div>
     </details>
 
@@ -2345,6 +2347,29 @@
     });
   });
   syncHighlightToggles();
+
+  document.querySelectorAll('.copy-deep-link').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const wrap = btn.closest('.deep-link-wrap');
+      const link = wrap && wrap.querySelector('.deep-link');
+      const url = link && link.href;
+      if (!url) return;
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(url);
+        copied = true;
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
+        ta.remove();
+      }
+      btn.textContent = copied ? 'Copied ✓' : 'Copy failed';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+    });
+  });
 
   const addColumnsMobileBtn = document.getElementById('addColumnsMobile');
   if (addColumnsMobileBtn) {

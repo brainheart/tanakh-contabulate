@@ -1323,11 +1323,13 @@
     addTh.className = 'add-column-th';
     addTh.dataset.key = '__add';
     addTh.title = 'Add columns: commentators and text metrics';
-    addTh.setAttribute('aria-label', 'Add columns');
-    const addSpan = document.createElement('span');
-    addSpan.className = 'add-column-plus';
-    addSpan.textContent = '+';
-    addTh.appendChild(addSpan);
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'add-column-plus';
+    addBtn.textContent = '+';
+    addBtn.setAttribute('aria-label', 'Add columns');
+    addBtn.setAttribute('aria-haspopup', 'dialog');
+    addTh.appendChild(addBtn);
     addTh.addEventListener('click', (e) => {
       e.stopPropagation();
       if (typeof window.showAddColumnPopover === 'function') window.showAddColumnPopover(addTh);

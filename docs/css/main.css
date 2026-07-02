@@ -604,10 +604,19 @@ th.add-column-th {
 }
 th.add-column-th .add-column-plus {
   display: inline-block;
+  background: transparent;
+  border: none;
+  padding: 0;
   font-size: 1.25rem;
   font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
   color: var(--burgundy);
+  cursor: pointer;
+}
+th.add-column-th .add-column-plus:hover {
+  background: transparent;
+  box-shadow: none;
 }
 td.add-column-cell {
   padding: 0;

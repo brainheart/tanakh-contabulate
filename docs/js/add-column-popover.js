@@ -27,7 +27,11 @@
   }
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closePopover();
+    if (e.key !== 'Escape' || !pop) return;
+    closePopover();
+    // Return focus to the opener (or its rebuilt equivalent) for keyboard users.
+    const opener = document.querySelector('.add-column-th .add-column-plus, .add-columns-mobile');
+    if (opener) opener.focus();
   });
 
   document.addEventListener('click', (e) => {

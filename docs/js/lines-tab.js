@@ -269,7 +269,9 @@
         if (Number(row.commentary_interest) > 0 && typeof window.buildCommentaryDetailLink === 'function') {
           tdInterest.appendChild(window.buildCommentaryDetailLink(row.commentary_interest, row, 'line', 'commentary_interest'));
         } else {
-          tdInterest.textContent = row.commentary_interest ?? 0;
+          tdInterest.textContent = typeof window.formatCellNumber === 'function'
+            ? window.formatCellNumber(row.commentary_interest ?? 0)
+            : (row.commentary_interest ?? 0);
         }
 
         const tdText = document.createElement('td');

@@ -61,6 +61,12 @@
     return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
   }
 
+  function formatCellNumber(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return value == null ? '' : String(value);
+    return num.toLocaleString('en-US', { maximumFractionDigits: 4 });
+  }
+
   function fmtPct(num) {
     return (num * 100).toFixed(3) + '%';
   }
@@ -296,6 +302,7 @@
   window.quantiles = quantiles;
   window.normName = normName;
   window.fmtPct = fmtPct;
+  window.formatCellNumber = formatCellNumber;
   window.escapeHTML = escapeHTML;
   window.highlightHTML = highlightHTML;
   window.toCsvValue = toCsvValue;

@@ -133,12 +133,17 @@
     return null;
   }
 
+  function formatCount(value) {
+    if (typeof window.formatCellNumber === 'function') return window.formatCellNumber(value);
+    return value == null ? '' : String(value);
+  }
+
   function buildCommentaryDetailLink(value, row, granularity, columnKey) {
     const count = Number(value) || 0;
     const scope = scopeForRow(row);
     if (!count || !scope) {
       const span = document.createElement('span');
-      span.textContent = value == null ? '' : String(value);
+      span.textContent = formatCount(value);
       return span;
     }
 
@@ -146,7 +151,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'commentary-count-link';
-    btn.textContent = String(value);
+    btn.textContent = formatCount(value);
     if (scope.genre) btn.dataset.genre = scope.genre;
     if (scope.book) btn.dataset.book = scope.book;
     if (scope.chapter != null) btn.dataset.chapter = String(scope.chapter);

@@ -2062,6 +2062,7 @@
       label: getHeaderLabelText(th)
     }));
     const cols = colDefs.map((c) => c.key);
+    const colTypeByKey = new Map(colDefs.map((c) => [c.key, c.type]));
     const numericRankIndex = buildNumericRankIndex(segmentsAllRows, colDefs);
     const granVal = gran.value;
 
@@ -2109,7 +2110,12 @@
           td.classList.add('book-cell');
         } else {
           const v = r[k];
-          td.textContent = (v === undefined || v === null) ? '' : v;
+          if (colTypeByKey.get(k) === 'number' && v !== undefined && v !== null && Number.isFinite(Number(v))) {
+            td.textContent = formatCellNumber(v);
+            td.dataset.value = String(v);
+          } else {
+            td.textContent = (v === undefined || v === null) ? '' : v;
+          }
         }
         if (k === 'title' || k === 'play_title') td.classList.add('book-cell');
         if (k === 'genre') td.classList.add('hebrew');

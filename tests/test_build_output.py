@@ -75,6 +75,13 @@ def test_commentary_summary_and_book_totals():
     assert len(genesis_detail["verses"]["Gen.1.1"]) == chunks[0]["commentary_interest"]
     assert isinstance(genesis_detail["verses"]["Gen.1.1"][0][1], list)
 
+    # Detail refs are clamped to the built corpus, so detail record totals
+    # agree with the count columns at every level.
+    genesis_canonical_ids = {c["canonical_id"] for c in chunks if c["play_abbr"] == "Gen"}
+    assert set(genesis_detail["verses"]).issubset(genesis_canonical_ids)
+    detail_total = sum(len(records) for records in genesis_detail["verses"].values())
+    assert detail_total == plays[0]["commentary_interest"]
+
 
 def test_token_indexes_include_common_hebrew_terms():
     tokens = load_json(DATA / "tokens.json")

@@ -212,15 +212,27 @@ def load_commentary_interest(project_root: Path):
     return {"metadata": metadata, "summary": summary, "verses": verses}
 
 
-def copy_commentary_details(project_root: Path, out_dir: Path):
+def write_commentary_details(project_root: Path, out_dir: Path, canonical_ids):
+    """Copy per-book comment detail files, dropping refs to verses outside the
+    built corpus so detail lists agree with the count columns everywhere."""
     source_dir = project_root / "commentary" / COMMENTARY_DETAIL_SOURCE_DIR
     target_dir = out_dir / "commentary"
     copied_books = []
     if not source_dir.exists():
         return copied_books
     for source_path in sorted(source_dir.glob("*.json")):
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+        verses = payload.get("verses") if isinstance(payload.get("verses"), dict) else {}
+        payload["verses"] = {
+            canonical_id: records
+            for canonical_id, records in verses.items()
+            if canonical_id in canonical_ids
+        }
         target_path = target_dir / source_path.name
-        shutil.copy2(source_path, target_path)
+        target_path.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
         copied_books.append(source_path.stem)
     return copied_books
 
@@ -273,10 +285,6 @@ def build(source_dir: Path, out_dir: Path) -> None:
     commentary_summary = commentary_interest["summary"]
     commentary_verses = commentary_interest["verses"]
     commentary_columns = get_commentary_columns(commentary_metadata)
-    commentary_detail_books = copy_commentary_details(project_root, out_dir)
-    if commentary_detail_books:
-        commentary_metadata["detail_path_template"] = "commentary/{book}.json"
-        commentary_metadata["detail_books"] = commentary_detail_books
 
     plays = []
     characters = []
@@ -411,6 +419,12 @@ def build(source_dir: Path, out_dir: Path) -> None:
         vid = chunk_row["scene_id"]
         chunk_row["char_count"] = verse_chars.get(vid, 0)
         chunk_row["rarity_sum"] = round(verse_rarity.get(vid, 0.0), 3)
+
+    canonical_ids = {chunk_row["canonical_id"] for chunk_row in chunks}
+    commentary_detail_books = write_commentary_details(project_root, out_dir, canonical_ids)
+    if commentary_detail_books:
+        commentary_metadata["detail_path_template"] = "commentary/{book}.json"
+        commentary_metadata["detail_books"] = commentary_detail_books
 
     write_json(data_dir / "plays.json", plays)
     write_json(data_dir / "characters.json", characters)

@@ -16,6 +16,7 @@ STRIP_POINTS_RE = re.compile(r"[\u0591-\u05BD\u05BF-\u05C7]")
 SLASH_RE = re.compile(r"/+")
 WHITESPACE_RE = re.compile(r"\s+")
 COMMENTARY_INTEREST_SOURCE = "sefaria_tanakh_commentary_interest.json"
+COMMENTARY_DETAIL_SOURCE_DIR = "details"
 SENT_RE = re.compile(r"[׃.!?]+")  # sof pasuq or western terminators
 
 BOOK_ORDER = [
@@ -78,7 +79,7 @@ BOOK_META = {
 
 def clean_output_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    for subdir_name in ("data", "lines"):
+    for subdir_name in ("data", "lines", "commentary"):
         subdir = path / subdir_name
         if subdir.exists():
             shutil.rmtree(subdir)
@@ -211,6 +212,19 @@ def load_commentary_interest(project_root: Path):
     return {"metadata": metadata, "summary": summary, "verses": verses}
 
 
+def copy_commentary_details(project_root: Path, out_dir: Path):
+    source_dir = project_root / "commentary" / COMMENTARY_DETAIL_SOURCE_DIR
+    target_dir = out_dir / "commentary"
+    copied_books = []
+    if not source_dir.exists():
+        return copied_books
+    for source_path in sorted(source_dir.glob("*.json")):
+        target_path = target_dir / source_path.name
+        shutil.copy2(source_path, target_path)
+        copied_books.append(source_path.stem)
+    return copied_books
+
+
 def get_commentary_columns(metadata):
     columns = []
     for item in metadata.get("commentators", []):
@@ -255,10 +269,14 @@ def build(source_dir: Path, out_dir: Path) -> None:
     lines_dir = out_dir / "lines"
     project_root = source_dir.parent
     commentary_interest = load_commentary_interest(project_root)
-    commentary_metadata = commentary_interest["metadata"]
+    commentary_metadata = dict(commentary_interest["metadata"])
     commentary_summary = commentary_interest["summary"]
     commentary_verses = commentary_interest["verses"]
     commentary_columns = get_commentary_columns(commentary_metadata)
+    commentary_detail_books = copy_commentary_details(project_root, out_dir)
+    if commentary_detail_books:
+        commentary_metadata["detail_path_template"] = "commentary/{book}.json"
+        commentary_metadata["detail_books"] = commentary_detail_books
 
     plays = []
     characters = []

@@ -212,6 +212,7 @@
 <script src="js/filter-popover.js"></script>
 <script src="js/color-scale.js"></script>
 <script src="js/play-detail.js"></script>
+<script src="js/commentary-detail.js"></script>
 <script src="js/lines-tab.js"></script>
 <script>
 (async function() {
@@ -2068,6 +2069,13 @@
             ? highlightHTML(r.line, r.line_highlight_regex)
             : escapeHTML(r.line);
           td.classList.add('hebrew');
+        } else if (typeof isCommentaryDetailCell === 'function' && isCommentaryDetailCell(k)) {
+          const v = r[k];
+          if (Number(v) > 0 && typeof buildCommentaryDetailLink === 'function') {
+            td.appendChild(buildCommentaryDetailLink(v, r, granVal, k));
+          } else {
+            td.textContent = (v === undefined || v === null) ? '' : v;
+          }
         } else if (typeof isCharacterDetailCell === 'function' && isCharacterDetailCell(granVal, k, r)) {
           const v = r[k];
           if (v !== undefined && v !== null && r.character_id != null) {
@@ -2367,6 +2375,9 @@
   // Initialize with data dependencies
   if (typeof window.initPlayDetail === 'function') {
     window.initPlayDetail({ chunks, tokens, tokens2, tokens3, playsById, chunkById, characters, characterNameFilterConfig, escapeHTML });
+  }
+  if (typeof window.initCommentaryDetail === 'function') {
+    window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML });
   }
 
   // Character Detail Modal — loaded from js/character-detail.js

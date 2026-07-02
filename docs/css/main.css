@@ -584,6 +584,164 @@ th { position: sticky; }
 .play-detail-link:hover {
   color: #6d1028;
 }
+.commentary-count-link {
+  background: transparent;
+  border: none;
+  /* Inherit the color-scale cell color so counts stay readable on any swatch */
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+.commentary-count-link:hover {
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-decoration-thickness: 2px;
+}
+.commentary-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 15, 12, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  animation: playDetailFadeIn 0.2s ease-out;
+}
+.commentary-detail-overlay.open { display: flex; }
+.commentary-detail-modal {
+  width: min(1100px, calc(100vw - 2rem));
+  max-height: 84vh;
+  background: linear-gradient(to bottom, var(--parchment) 0%, #fefdfb 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.commentary-detail-head {
+  position: relative;
+  padding: 1rem 1.1rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.72);
+}
+.commentary-detail-head h3 {
+  margin: 0;
+  color: var(--burgundy);
+  line-height: 1.25;
+  padding-right: 2.25rem;
+}
+.commentary-detail-meta {
+  margin-top: 0.35rem;
+  color: #5b4738;
+  font-size: 0.95rem;
+}
+.commentary-detail-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--burgundy);
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.commentary-detail-close:hover { background: #f7efe6; }
+.commentary-detail-body {
+  overflow: auto;
+  /* No top padding so the sticky table header hugs the scrollport edge */
+  padding: 0 1.1rem 1.1rem;
+}
+.commentary-detail-loading {
+  padding: 1.5rem 0.5rem;
+  color: #5b4738;
+  font-style: italic;
+}
+.commentary-detail-table {
+  margin-top: 0;
+  font-size: 0.92rem;
+}
+.commentary-detail-table th,
+.commentary-detail-table td {
+  padding: 0.45rem 0.6rem;
+  vertical-align: top;
+}
+.commentary-detail-table th {
+  z-index: 5;
+}
+.commentary-detail-table th.commentary-detail-unsortable {
+  cursor: default;
+}
+.commentary-detail-table th.commentary-detail-unsortable:hover {
+  background: linear-gradient(to bottom, #faf8f3 0%, #f0ede5 100%);
+}
+.commentary-ref-cell,
+.commentary-link-cell {
+  white-space: nowrap;
+}
+.commentary-work-cell {
+  max-width: 13rem;
+}
+.commentary-work-ref {
+  color: #6d5b4f;
+  font-size: 0.88em;
+}
+.commentary-comment-cell {
+  width: 55%;
+}
+.commentary-link-cell a {
+  color: var(--burgundy);
+  font-weight: 600;
+}
+.commentary-preview {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.commentary-preview-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.commentary-preview.is-expandable {
+  cursor: pointer;
+}
+.commentary-preview-loading,
+.commentary-preview-unavailable {
+  color: #6d5b4f;
+  font-style: italic;
+}
+.commentary-detail-pagination {
+  margin: 0;
+  gap: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  flex-wrap: wrap;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.72);
+}
+.commentary-detail-pagination button,
+.commentary-detail-pagination select {
+  font-size: 0.9rem;
+}
+.commentary-detail-pagination label {
+  font-weight: 400;
+}
 .play-detail-overlay {
   position: fixed;
   inset: 0;

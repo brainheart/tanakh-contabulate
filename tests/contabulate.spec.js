@@ -22,6 +22,38 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await page.locator('#addCommentatorColumn').click();
   const commentatorHeaders = await page.locator('#results thead th').allTextContents();
   expect(commentatorHeaders.some((text) => text.includes('Rashi'))).toBeTruthy();
+  const commentButton = page.locator('#results tbody .commentary-count-link').first();
+  await expect(commentButton).toBeVisible();
+  await commentButton.click();
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeVisible();
+  await expect(page.locator('#commentaryDetailTitle')).toContainText('Commentary');
+  await expect(page.locator('.commentary-detail-table tbody tr').first()).toBeVisible();
+  await expect(page.locator('.commentary-detail-table .commentary-link-cell a').first()).toHaveAttribute('href', /sefaria\.org/);
+  await page.locator('.commentary-detail-close').click();
+
+  // Book-level counts open the same modal with all of the book's comments
+  await page.selectOption('#gran', 'play');
+  const bookCommentButton = page.locator('#results tbody .commentary-count-link').first();
+  await expect(bookCommentButton).toBeVisible();
+  await bookCommentButton.click();
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeVisible();
+  await expect(page.locator('.commentary-detail-table tbody tr').first()).toBeVisible();
+  await expect(page.locator('#commentaryDetailPagination')).toBeVisible();
+  await expect(page.locator('#commentaryDetailTotalInfo')).toContainText('comments');
+  // Sorting by commentator re-orders without breaking pagination
+  await page.locator('.commentary-detail-table th[data-key="commentator"]').click();
+  await expect(page.locator('.commentary-detail-table th[data-key="commentator"]')).toHaveClass(/sorted-asc/);
+  await page.locator('.commentary-detail-close').click();
+
+  // Section-level counts aggregate every book in the section
+  await page.selectOption('#gran', 'genre');
+  const sectionCommentButton = page.locator('#results tbody .commentary-count-link').first();
+  await expect(sectionCommentButton).toBeVisible();
+  await sectionCommentButton.click();
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeVisible();
+  await expect(page.locator('.commentary-detail-table tbody tr').first()).toBeVisible({ timeout: 20000 });
+  await page.locator('.commentary-detail-close').click();
+  await page.selectOption('#gran', 'line');
 
   await page.evaluate(() => {
     const tabs = document.querySelector('.tabs');

@@ -153,6 +153,7 @@
             ? playsById.get(line.play_id)
             : null;
           rows.push({
+            id: line.canonical_id,
             play_title: play ? play.title : 'Unknown',
             play_id: line.play_id,
             act: line.act,
@@ -265,7 +266,11 @@
         tdScene.textContent = sceneVal;
 
         const tdInterest = document.createElement('td');
-        tdInterest.textContent = row.commentary_interest ?? 0;
+        if (Number(row.commentary_interest) > 0 && typeof window.buildCommentaryDetailLink === 'function') {
+          tdInterest.appendChild(window.buildCommentaryDetailLink(row.commentary_interest, row, 'line', 'commentary_interest'));
+        } else {
+          tdInterest.textContent = row.commentary_interest ?? 0;
+        }
 
         const tdText = document.createElement('td');
         tdText.className = 'line-text';

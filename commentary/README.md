@@ -1,6 +1,6 @@
 # Commentary Interest Data
 
-This directory stores compact commentary-interest counts for the Tanakh site.
+This directory stores compact commentary-interest counts and per-book comment references for the Tanakh site.
 
 Current source:
 
@@ -8,7 +8,7 @@ Current source:
 - Categories: `Rishonim on Tanakh`, `Acharonim on Tanakh`, and `Modern Commentary on Tanakh`
 - Source format: Sefaria `cltk-flat` merged exports
 
-The generated JSON counts non-empty commentary segments that can be mapped to a canonical `Book.Chapter.Verse` reference. It does not include commentary text.
+The generated count JSON records non-empty commentary segments that can be mapped to a canonical `Book.Chapter.Verse` reference. Per-book files under `details/` retain source/comment refs for click-through lists. They do not embed full commentary text; the app fetches visible comment text from Sefaria and links each record to Sefaria/source JSON.
 
 Regenerate with:
 

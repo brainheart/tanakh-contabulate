@@ -1,7 +1,9 @@
 import argparse
 import concurrent.futures
+import html
 import json
 import re
+import shutil
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
@@ -12,6 +14,7 @@ from pathlib import Path
 BOOKS_JSON_URL = "https://raw.githubusercontent.com/Sefaria/Sefaria-Export/master/books.json"
 SOURCE_URL = "https://github.com/Sefaria/Sefaria-Export"
 GCS_BASE_URL = "https://storage.googleapis.com/sefaria-export/"
+SEFARIA_BASE_URL = "https://www.sefaria.org/"
 ALLOWED_COMMENTARY_CATEGORIES = {
     "Rishonim on Tanakh",
     "Acharonim on Tanakh",
@@ -90,12 +93,17 @@ BOOK_TITLE_TO_ABBR = {
 BOOK_TITLES_BY_LENGTH = sorted(BOOK_TITLE_TO_ABBR, key=len, reverse=True)
 TAG_RE = re.compile(r"<[^>]+>")
 SLUG_RE = re.compile(r"[^a-z0-9]+")
+CANONICAL_ID_RE = re.compile(r"^([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)$")
 
 
 def fetch_json(url):
     quoted_url = urllib.parse.quote(url, safe=":/?&=%")
     with urllib.request.urlopen(quoted_url, timeout=60) as response:
         return json.load(response)
+
+
+def quote_source_url(url):
+    return urllib.parse.quote(str(url or ""), safe=":/?&=%")
 
 
 def slugify(value):
@@ -107,6 +115,11 @@ def is_nonempty_text(value):
     if not isinstance(value, str):
         return False
     return bool(TAG_RE.sub("", value).strip())
+
+
+def plain_text(value):
+    text = TAG_RE.sub(" ", str(value or ""))
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
 def choose_commentary_entries(books_payload):
@@ -154,10 +167,11 @@ def infer_book_from_title(title):
     return None
 
 
-def parse_flat_key(key, default_abbr):
+def parse_flat_ref(key, default_abbr):
     abbr = default_abbr
     chapter = None
     verse = None
+    sections = []
     for part in str(key or "").split(","):
         part = part.strip()
         if "_" not in part:
@@ -168,19 +182,46 @@ def parse_flat_key(key, default_abbr):
         except ValueError:
             continue
         label = label.replace("_", " ").strip()
+        if not label:
+            continue
         lower_label = label.lower()
         if lower_label in BOOK_TITLE_TO_ABBR:
             abbr = BOOK_TITLE_TO_ABBR[lower_label]
+            continue
         if label in CHAPTER_LABELS:
             chapter = index + 1
+            sections.append(chapter)
         elif label in VERSE_LABELS:
             verse = index + 1
+            sections.append(verse)
+        else:
+            sections.append(index + 1)
     if abbr and chapter and verse:
-        return f"{abbr}.{chapter}.{verse}"
+        return {
+            "canonical_id": f"{abbr}.{chapter}.{verse}",
+            "sections": sections,
+        }
     return None
 
 
-def parse_commentary_entry(item):
+def parse_flat_key(key, default_abbr):
+    parsed = parse_flat_ref(key, default_abbr)
+    return parsed["canonical_id"] if parsed else None
+
+
+def canonical_sort_key(canonical_id):
+    match = CANONICAL_ID_RE.match(str(canonical_id or ""))
+    if not match:
+        return (str(canonical_id or ""), 0, 0)
+    return (match.group(1), int(match.group(2)), int(match.group(3)))
+
+
+def sefaria_title_path(title):
+    underscored = re.sub(r"\s+", "_", str(title or "").strip())
+    return urllib.parse.quote(underscored, safe="._-")
+
+
+def parse_commentary_entry(item, include_details=False, include_detail_text=False):
     label = commentator_label(item)
     default_abbr = infer_book_from_title(item.get("title"))
     result = {
@@ -188,8 +229,9 @@ def parse_commentary_entry(item):
         "language": item.get("language"),
         "commentator": label,
         "category": (item.get("categories") or [None, None])[1],
-        "source_url": item.get("cltk_flat_url"),
+        "source_url": quote_source_url(item.get("cltk_flat_url")),
         "counts": {},
+        "details": {},
         "segment_count": 0,
         "mapped_count": 0,
         "skipped_count": 0,
@@ -199,17 +241,25 @@ def parse_commentary_entry(item):
     if not isinstance(text, dict):
         return result
     counts = Counter()
+    details = defaultdict(list)
     for key, value in text.items():
         if not is_nonempty_text(value):
             continue
         result["segment_count"] += 1
-        ref = parse_flat_key(key, default_abbr)
-        if ref:
+        parsed_ref = parse_flat_ref(key, default_abbr)
+        if parsed_ref:
+            ref = parsed_ref["canonical_id"]
             counts[ref] += 1
             result["mapped_count"] += 1
+            if include_details:
+                detail = {"sections": parsed_ref["sections"]}
+                if include_detail_text:
+                    detail["text"] = plain_text(value)
+                details[ref].append(detail)
         else:
             result["skipped_count"] += 1
     result["counts"] = dict(counts)
+    result["details"] = dict(details)
     return result
 
 
@@ -223,12 +273,15 @@ def make_unique_commentator_keys(labels):
     return output
 
 
-def build_interest(books_url, max_workers):
+def build_interest(books_url, max_workers, include_details=False, include_detail_text=False):
     books_payload = fetch_json(books_url)
     entries = choose_commentary_entries(books_payload)
     parsed = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(parse_commentary_entry, item) for item in entries]
+        futures = [
+            executor.submit(parse_commentary_entry, item, include_details, include_detail_text)
+            for item in entries
+        ]
         for future in concurrent.futures.as_completed(futures):
             parsed.append(future.result())
 
@@ -239,12 +292,20 @@ def build_interest(books_url, max_workers):
     verse_totals = Counter()
     verse_by_commentator = defaultdict(Counter)
     category_counts = Counter()
+    detail_books = defaultdict(lambda: {"sources": [], "verses": defaultdict(list)})
+    detail_source_indexes = defaultdict(dict)
 
     for item in parsed:
         label = item.get("commentator")
         key = key_by_label.get(label)
         if not key:
             continue
+        source_identity = (
+            item.get("title") or "",
+            item.get("language") or "",
+            key,
+            item.get("source_url") or "",
+        )
         title_has_mapped = False
         for canonical_id, count in item.get("counts", {}).items():
             if not count:
@@ -256,6 +317,30 @@ def build_interest(books_url, max_workers):
             category_counts[item.get("category") or "unknown"] += count
         if title_has_mapped:
             commentator_titles[key] += 1
+        if include_details and title_has_mapped:
+            for canonical_id, comments in item.get("details", {}).items():
+                if not comments:
+                    continue
+                book = canonical_id.split(".", 1)[0]
+                source_indexes = detail_source_indexes[book]
+                if source_identity not in source_indexes:
+                    source_indexes[source_identity] = len(detail_books[book]["sources"])
+                    detail_books[book]["sources"].append(
+                        {
+                            "key": key,
+                            "commentator": label,
+                            "title": item.get("title"),
+                            "language": item.get("language"),
+                            "source_url": item.get("source_url"),
+                            "sefaria_path": sefaria_title_path(item.get("title")),
+                        }
+                    )
+                source_index = source_indexes[source_identity]
+                for comment in comments:
+                    record = [source_index, comment["sections"]]
+                    if include_detail_text:
+                        record.append(comment.get("text", ""))
+                    detail_books[book]["verses"][canonical_id].append(record)
 
     labels_by_key = {key: label for label, key in key_by_label.items()}
     commentators = [
@@ -281,18 +366,26 @@ def build_interest(books_url, max_workers):
             "by_commentator": by_commentator,
         }
 
+    metadata = {
+        "source_id": "sefaria_tanakh_commentaries",
+        "source_name": "Sefaria Export Tanakh Commentaries",
+        "source_url": SOURCE_URL,
+        "books_json_url": books_url,
+        "gcs_base_url": GCS_BASE_URL,
+        "sefaria_base_url": SEFARIA_BASE_URL,
+        "license_notes_url": "https://developers.sefaria.org/docs/usage-of-our-name-and-logo",
+        "commentators": commentators,
+        "category_counts": dict(sorted(category_counts.items())),
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "selection_note": "One merged text per commentary title, preferring Hebrew over English, from Sefaria Tanakh commentary categories.",
+    }
+    if include_details:
+        metadata["detail_path_template"] = "commentary/{book}.json"
+        metadata["detail_books"] = sorted(detail_books)
+
     return {
         "metadata": {
-            "source_id": "sefaria_tanakh_commentaries",
-            "source_name": "Sefaria Export Tanakh Commentaries",
-            "source_url": SOURCE_URL,
-            "books_json_url": books_url,
-            "gcs_base_url": GCS_BASE_URL,
-            "license_notes_url": "https://developers.sefaria.org/docs/usage-of-our-name-and-logo",
-            "commentators": commentators,
-            "category_counts": dict(sorted(category_counts.items())),
-            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            "selection_note": "One merged text per commentary title, preferring Hebrew over English, from Sefaria Tanakh commentary categories.",
+            **metadata,
         },
         "summary": {
             "source_title_count": len(entries),
@@ -305,7 +398,29 @@ def build_interest(books_url, max_workers):
             "total_interest": sum(verse_totals.values()),
         },
         "verses": verses,
+        "detail_books": detail_books,
     }
+
+
+def write_detail_books(detail_books, out_dir):
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for book in sorted(detail_books):
+        payload = detail_books[book]
+        verses = {
+            canonical_id: payload["verses"][canonical_id]
+            for canonical_id in sorted(payload["verses"], key=canonical_sort_key)
+        }
+        detail_payload = {
+            "book": book,
+            "sources": payload["sources"],
+            "verses": verses,
+        }
+        (out_dir / f"{book}.json").write_text(
+            json.dumps(detail_payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
 
 
 def main():
@@ -319,17 +434,43 @@ def main():
     )
     parser.add_argument("--books-url", default=BOOKS_JSON_URL, help="Sefaria Export books.json URL")
     parser.add_argument("--max-workers", type=int, default=16, help="Concurrent download workers")
+    parser.add_argument(
+        "--details-dir",
+        type=Path,
+        default=Path("commentary/details"),
+        help="Output directory for per-book commentary detail JSON",
+    )
+    parser.add_argument(
+        "--no-details",
+        action="store_true",
+        help="Only write compact counts, without per-book comment detail files",
+    )
+    parser.add_argument(
+        "--include-detail-text",
+        action="store_true",
+        help="Embed full comment text in detail files instead of fetching visible text from Sefaria at runtime",
+    )
     args = parser.parse_args()
 
-    payload = build_interest(args.books_url, args.max_workers)
+    include_details = not args.no_details
+    payload = build_interest(
+        args.books_url,
+        args.max_workers,
+        include_details=include_details,
+        include_detail_text=args.include_detail_text,
+    )
+    detail_books = payload.pop("detail_books", {})
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    if include_details:
+        write_detail_books(detail_books, args.details_dir)
     summary = payload["summary"]
     print(
         "Done: "
         f"{summary['total_interest']} mapped commentary segments, "
         f"{len(payload['metadata']['commentators'])} commentators, "
         f"{summary['verses_with_interest']} verses"
+        + (f", {len(detail_books)} detail files" if include_details else "")
     )
 
 

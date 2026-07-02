@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 DATA = DOCS / "data"
 LINES = DOCS / "lines"
+COMMENTARY = DOCS / "commentary"
 HEBREW_RE = re.compile(r"[\u05D0-\u05EA]")
 
 
@@ -27,6 +28,7 @@ def test_expected_output_files_exist_and_are_nonempty():
         DATA / "tokens_char3.json",
         DATA / "character_name_filter_config.json",
         DATA / "commentary_interest.json",
+        COMMENTARY / "Gen.json",
         LINES / "all_lines.json",
     ]
     for path in expected:
@@ -59,11 +61,19 @@ def test_chunks_and_lines_contain_hebrew_text():
 def test_commentary_summary_and_book_totals():
     commentary = load_json(DATA / "commentary_interest.json")
     plays = load_json(DATA / "plays.json")
+    chunks = load_json(DATA / "chunks.json")
+    genesis_detail = load_json(COMMENTARY / "Gen.json")
 
     assert commentary["metadata"]["source_id"] == "sefaria_tanakh_commentaries"
     assert len(commentary["metadata"]["commentators"]) >= 70
+    assert commentary["metadata"]["detail_path_template"] == "commentary/{book}.json"
+    assert len(commentary["metadata"]["detail_books"]) == 39
     assert commentary["summary"]["total_interest"] > 300000
     assert plays[0]["commentary_interest"] > 40000
+    assert genesis_detail["book"] == "Gen"
+    assert len(genesis_detail["sources"]) >= 50
+    assert len(genesis_detail["verses"]["Gen.1.1"]) == chunks[0]["commentary_interest"]
+    assert isinstance(genesis_detail["verses"]["Gen.1.1"][0][1], list)
 
 
 def test_token_indexes_include_common_hebrew_terms():

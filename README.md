@@ -30,6 +30,7 @@ This parses all 39 Tanakh books in traditional order and writes:
 - `docs/data/tokens_char*.json`
 - `docs/data/character_name_filter_config.json`
 - `docs/data/commentary_interest.json`
+- `docs/commentary/*.json`
 - `docs/lines/all_lines.json`
 
 ## Local Preview
@@ -60,5 +61,5 @@ npx playwright test
 
 - Search indexes are accent-insensitive for Hebrew matching.
 - Display text preserves pointed Hebrew and sof pasuq punctuation.
-- Commentary counts store only per-verse counts and commentator metadata, not commentary text.
+- Commentary counts store per-verse counts, commentator metadata, and compact per-book comment references. The app fetches visible comment text from Sefaria when a commentary count is opened.
 - The overall UI remains LTR, while Hebrew content cells and verse text render RTL.

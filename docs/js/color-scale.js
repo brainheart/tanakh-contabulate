@@ -170,6 +170,9 @@
   function renderAllLegends() {
     const pal = getPalette(state.colorScalePalette, state.colorScaleSteps);
     document.querySelectorAll('.color-scale-legend').forEach(el => renderLegend(el, pal));
+    document.querySelectorAll('.color-scale-legend-inline').forEach(el => {
+      el.classList.toggle('is-hidden', !state.colorScaleEnabled);
+    });
   }
 
   function initColorScaleModule(initDeps) {

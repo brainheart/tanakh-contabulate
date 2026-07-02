@@ -576,6 +576,16 @@ input[type="checkbox"] {
 .legend-wrap { display: inline-flex; gap: 4px; align-items: center; margin-top: 4px; }
 .legend-swatch { width: 26px; height: 14px; border: 1px solid var(--border); border-radius: 2px; display: inline-block; }
 .legend-labels { display: flex; justify-content: space-between; gap: 2rem; font-size: 0.85rem; color: #665544; margin-top: 2px; max-width: 220px; }
+/* Compact legend pinned above the results table (the drawer copy stays too) */
+.color-scale-legend-inline {
+  width: fit-content;
+  margin: 0.75rem 0 -0.75rem auto;
+}
+.color-scale-legend-inline .legend-labels {
+  max-width: none;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
 /* Column filter UI */
 th { position: sticky; }
 .th-label { display: inline; }

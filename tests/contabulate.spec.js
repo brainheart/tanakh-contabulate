@@ -14,12 +14,19 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   expect(options.some((opt) => opt.value === 'scene')).toBeFalsy();
   expect(options).toContainEqual({ value: 'line', text: 'Verse' });
 
-  await page.locator('#segmentsTab details summary').click();
-  const optionTexts = await page.locator('#commentatorColumnSelect option').allTextContents();
-  expect(optionTexts.some((text) => text === 'Rashi (28,247)')).toBeTruthy();
-  await page.locator('#commentatorColumnFilter').fill('rashi');
-  await expect(page.locator('#commentatorColumnControls .commentator-filter-count')).toContainText('1 of');
-  await page.locator('#addCommentatorColumn').click();
+  // Column adding lives in the "+" header cell popover
+  await page.locator('#results thead th.add-column-th').click();
+  const popover = page.locator('.add-column-popover');
+  await expect(popover).toBeVisible();
+  await expect(popover.locator('.add-column-option', { hasText: 'Words/Sentence' })).toBeVisible();
+  await popover.locator('.add-column-search').fill('rashi');
+  const rashiOption = popover.locator('.add-column-option', { hasText: 'Rashi' });
+  await expect(rashiOption).toHaveCount(1);
+  await expect(rashiOption.locator('.count')).toHaveText('28,247');
+  await rashiOption.click();
+  await expect(popover.locator('.add-column-option.is-selected', { hasText: 'Rashi' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(popover).toBeHidden();
   const commentatorHeaders = await page.locator('#results thead th').allTextContents();
   expect(commentatorHeaders.some((text) => text.includes('Rashi'))).toBeTruthy();
   const commentButton = page.locator('#results tbody .commentary-count-link').first();

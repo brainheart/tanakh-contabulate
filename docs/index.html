@@ -32,7 +32,7 @@
   <div class="tab-content" id="segmentsTab">
     <div class="controls">
       <div class="controls-row">
-        <button id="addColumnBtn" class="add-column-btn" type="button">Add Column</button>
+        <button id="addColumnBtn" class="add-column-btn" type="button">Add word column</button>
         <span class="label-strong">for</span>
         <select id="newTermDisplay" class="control-select">
           <option value="count" selected># hits</option>
@@ -58,21 +58,17 @@
             <option value="3">trigrams</option>
           </select>
         </span>
-        <input id="q" class="query-input" type="text" dir="auto" placeholder="Type Hebrew or Latin here, then hit &quot;Add Column&quot;">
+        <input id="q" class="query-input" type="text" dir="auto" placeholder="Type Hebrew or Latin here, then hit &quot;Add word column&quot;">
       </div>
       <div id="termWarning" class="warning is-hidden" role="status" aria-live="polite"></div>
     </div>
 
     <details>
-      <summary class="sr"><strong>Options</strong></summary>
+      <summary class="sr"><strong>Display options</strong></summary>
       <div class="options-row">
         <label><input type="checkbox" class="color-scale-toggle" checked> Color scale numeric columns</label>
         <label><input type="checkbox" class="highlight-toggle" checked> Highlight matching verse text</label>
         <label><input type="checkbox" id="showZeroRows"> Show zero-hit rows</label>
-        <div id="commentatorColumnControls" class="commentator-column-controls" role="group" aria-label="Individual commentator columns">
-          <span class="label-strong">Commentator columns:</span>
-          <span class="muted">Loading...</span>
-        </div>
         <button id="downloadSegmentsCsv" class="download-btn" type="button">Download CSV</button>
         <div class="color-scale-options">
           <label>Palette:
@@ -89,13 +85,6 @@
             </select>
           </label>
         </div>
-      </div>
-      <div class="options-row">
-        <span class="label-strong">Extra columns:</span>
-        <label title="Average sentence length: words per sentence, with sentences split on sof pasuq (׃) — higher = longer, more complex sentences."><input type="checkbox" class="metric-col-toggle" data-metric="wps"> Words/Sentence</label>
-        <label title="Average word length in letters. Higher = longer words."><input type="checkbox" class="metric-col-toggle" data-metric="wlen"> Word Length</label>
-        <label title="How rare the vocabulary is: each word is scored by its rarity in the whole corpus (−log10 of its frequency share), averaged over the row's words. Higher = rarer vocabulary."><input type="checkbox" class="metric-col-toggle" data-metric="rare"> Lexical Rarity</label>
-        <label title="Vocabulary diversity (MATTR-50): type–token ratio averaged over a moving 50-word window, 0–1. Higher = more varied vocabulary; comparable across texts of different lengths. Available at Book level."><input type="checkbox" class="metric-col-toggle" data-metric="mattr"> Vocab Diversity</label>
       </div>
       <div class="color-scale-legend"></div>
       <div class="deep-link-wrap">
@@ -151,7 +140,7 @@
     </div>
 
     <details>
-      <summary class="sr"><strong>Options</strong></summary>
+      <summary class="sr"><strong>Display options</strong></summary>
       <div class="options-row">
         <label><input type="checkbox" class="color-scale-toggle" checked> Color scale numeric columns</label>
         <label><input type="checkbox" class="highlight-toggle" checked> Highlight matching verse text</label>
@@ -213,6 +202,7 @@
 <script src="js/color-scale.js"></script>
 <script src="js/play-detail.js"></script>
 <script src="js/commentary-detail.js"></script>
+<script src="js/add-column-popover.js"></script>
 <script src="js/lines-tab.js"></script>
 <script>
 (async function() {
@@ -229,7 +219,7 @@
   const commentatorColumnControls = document.getElementById('commentatorColumnControls');
   const addColumnBtn = document.getElementById('addColumnBtn');
   const termWarning = document.getElementById('termWarning');
-  const qPlaceholderText = 'Type a Hebrew term here, then hit "Add Column"';
+  const qPlaceholderText = 'Type a Hebrew term here, then hit "Add word column"';
   const addColumnPromptScheduleMs = [3000, 5000, 10000];
   const allowAddColumnPromptMotion = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   let qPlaceholderTimer = null;
@@ -1221,10 +1211,12 @@
   // No selectedPlayIds — include all plays; use header filters to refine
   function downloadSegmentsCsvAll(filename) {
     if (!segmentsAllRows || segmentsAllRows.length === 0) return;
-    const cols = Array.from(theadRow.children).map(th => ({
-      key: th.dataset.key,
-      label: (th.childNodes[0]?.textContent || th.textContent || '').replace('⚙','').trim()
-    }));
+    const cols = Array.from(theadRow.children)
+      .filter(th => th.dataset.key && th.dataset.key !== '__add')
+      .map(th => ({
+        key: th.dataset.key,
+        label: (th.childNodes[0]?.textContent || th.textContent || '').replace('⚙','').trim()
+      }));
     if (cols.length === 0) return;
     const rows = [cols.map(c => c.label)];
     for (const r of segmentsAllRows) {
@@ -1322,6 +1314,20 @@
       });
       theadRow.appendChild(th);
     });
+    const addTh = document.createElement('th');
+    addTh.className = 'add-column-th';
+    addTh.dataset.key = '__add';
+    addTh.title = 'Add columns: commentators and text metrics';
+    addTh.setAttribute('aria-label', 'Add columns');
+    const addSpan = document.createElement('span');
+    addSpan.className = 'add-column-plus';
+    addSpan.textContent = '+';
+    addTh.appendChild(addSpan);
+    addTh.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (typeof window.showAddColumnPopover === 'function') window.showAddColumnPopover(addTh);
+    });
+    theadRow.appendChild(addTh);
     updateSortIndicators();
   }
   
@@ -2058,6 +2064,11 @@
       const tr = document.createElement('tr');
       cols.forEach((k) => {
         const td = document.createElement('td');
+        if (k === '__add') {
+          td.className = 'add-column-cell';
+          tr.appendChild(td);
+          return;
+        }
         if (k === 'act' && r.act_label) {
           td.textContent = r.act_label;
         } else if (k === 'scene' && r.scene_label) {
@@ -2378,6 +2389,26 @@
   }
   if (typeof window.initCommentaryDetail === 'function') {
     window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML });
+  }
+  if (typeof window.initAddColumnPopover === 'function') {
+    window.initAddColumnPopover({
+      getCommentators: getCommentatorConfig,
+      isCommentatorSelected: (key) => selectedCommentatorColumns.has(key),
+      toggleCommentator: (key) => {
+        if (selectedCommentatorColumns.has(key)) removeCommentatorColumn(key);
+        else addCommentatorColumn(key);
+      },
+      getMetricDefs: () => METRIC_COL_DEFS,
+      isMetricEnabled: (code) => enabledMetricCodes.includes(code),
+      toggleMetric: (code) => {
+        enabledMetricCodes = enabledMetricCodes.includes(code)
+          ? enabledMetricCodes.filter(c => c !== code)
+          : METRIC_COL_DEFS.map(d => d.code).filter(c => enabledMetricCodes.includes(c) || c === code);
+        doSearch();
+      },
+      formatCount: formatCommentatorReferenceCount,
+      focusSearch: () => { if (q) q.focus(); }
+    });
   }
 
   // Character Detail Modal — loaded from js/character-detail.js

@@ -64,6 +64,7 @@
           <input id="q" class="query-input" type="text" dir="auto" placeholder="Type Hebrew or Latin here, then hit &quot;Add&quot;">
           <button id="addColumnBtn" class="add-column-btn" type="button">Add</button>
         </div>
+        <button id="addColumnsMobile" class="add-columns-mobile" type="button" aria-haspopup="dialog">+ Commentator &amp; metric columns</button>
       </div>
       <div id="termWarning" class="warning is-hidden" role="status" aria-live="polite"></div>
     </div>
@@ -2344,6 +2345,14 @@
     });
   });
   syncHighlightToggles();
+
+  const addColumnsMobileBtn = document.getElementById('addColumnsMobile');
+  if (addColumnsMobileBtn) {
+    addColumnsMobileBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (typeof window.showAddColumnPopover === 'function') window.showAddColumnPopover(addColumnsMobileBtn);
+    });
+  }
 
   const downloadSegBtn = document.getElementById('downloadSegmentsCsv');
   if (downloadSegBtn) {

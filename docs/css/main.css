@@ -208,6 +208,22 @@ td.ranked-cell {
   min-height: 1.6rem;
   background: var(--border);
 }
+/* On phones the table's "+" header cell sits off-screen to the right, so
+   surface the same popover from a toolbar button instead. */
+.add-columns-mobile {
+  display: none;
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--burgundy);
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+}
+.add-columns-mobile:hover {
+  background: #f7efe6;
+  box-shadow: none;
+}
 .add-column-btn {
   position: relative;
   overflow: visible;
@@ -1091,6 +1107,9 @@ td.add-column-cell {
   }
   .control-divider {
     display: none;
+  }
+  .add-columns-mobile {
+    display: inline-block;
   }
   .control-group {
     width: 100%;

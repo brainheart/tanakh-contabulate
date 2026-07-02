@@ -42,6 +42,9 @@
     renderToken: 0
   };
   let els = null;
+  // Serialized scope of the open modal ("Gen.1.1~rashi"); empty when closed.
+  let currentDetailParam = '';
+  let onStateChange = null;
 
   function getDetailPathTemplate() {
     const metadata = commentaryConfig && commentaryConfig.metadata;
@@ -273,6 +276,10 @@
     if (els) els.overlay.classList.remove('open');
     state.renderToken++;
     textFetchQueue.length = 0;
+    if (currentDetailParam) {
+      currentDetailParam = '';
+      notifyStateChange();
+    }
   }
 
   function setLoading(message) {
@@ -693,6 +700,52 @@
     return parts.join(' · ');
   }
 
+  function scopeToParam(scope, commentatorKey) {
+    let base = '';
+    if (scope.genre) {
+      base = `genre:${scope.genre}`;
+    } else if (scope.book) {
+      base = scope.book;
+      if (scope.chapter != null) base += `.${scope.chapter}`;
+      if (scope.verse != null) base += `.${scope.verse}`;
+    }
+    if (!base) return '';
+    return commentatorKey ? `${base}~${commentatorKey}` : base;
+  }
+
+  function paramToScope(value) {
+    const [main, commentatorKey = ''] = String(value || '').split('~');
+    if (!main) return null;
+    if (main.startsWith('genre:')) {
+      const genre = main.slice('genre:'.length);
+      if (!genre) return null;
+      return { scope: { genre, book: '', chapter: null, verse: null, label: genre }, commentatorKey };
+    }
+    const parts = main.split('.');
+    const book = parts[0];
+    if (!book || !bookOrder.has(book)) return null;
+    const chapter = parts.length > 1 ? Number.parseInt(parts[1], 10) : NaN;
+    const verse = parts.length > 2 ? Number.parseInt(parts[2], 10) : NaN;
+    const play = playsList[bookOrder.get(book)];
+    let label = play && play.title ? String(play.title) : book;
+    if (Number.isFinite(chapter)) label += ` ${chapter}`;
+    if (Number.isFinite(verse)) label += `:${verse}`;
+    return {
+      scope: {
+        genre: '',
+        book,
+        chapter: Number.isFinite(chapter) ? chapter : null,
+        verse: Number.isFinite(verse) ? verse : null,
+        label
+      },
+      commentatorKey
+    };
+  }
+
+  function notifyStateChange() {
+    if (typeof onStateChange === 'function') onStateChange();
+  }
+
   async function openFromTrigger(trigger) {
     const scope = {
       genre: trigger.dataset.genre || '',
@@ -701,11 +754,17 @@
       verse: trigger.dataset.verse ? Number.parseInt(trigger.dataset.verse, 10) : null,
       label: trigger.dataset.scopeLabel || trigger.dataset.book || trigger.dataset.genre || ''
     };
+    return openScope(scope, trigger.dataset.commentatorKey || '', Number(trigger.dataset.count) || 0);
+  }
+
+  async function openScope(scope, commentatorKey, expectedCount) {
     const books = booksForScope(scope);
     if (!books.length) return;
 
-    const commentatorKey = trigger.dataset.commentatorKey || '';
-    const commentatorLabel = trigger.dataset.commentatorLabel || (commentatorByKey.get(commentatorKey) || {}).label || '';
+    currentDetailParam = scopeToParam(scope, commentatorKey);
+    notifyStateChange();
+
+    const commentatorLabel = (commentatorByKey.get(commentatorKey) || {}).label || '';
     const modal = ensureModal();
     modal.overlay.classList.add('open');
     state.title = commentatorLabel
@@ -732,7 +791,7 @@
       const comments = collectComments(bookDataList, scope, commentatorKey);
       state.comments = comments;
       state.sorted = false;
-      const expected = Number(trigger.dataset.count) || comments.length;
+      const expected = Number(expectedCount) || comments.length;
       state.meta = describeComments(comments, commentatorLabel, expected, failedBooks);
       renderComments();
     } catch (e) {
@@ -773,6 +832,7 @@
     playsById = deps.playsById || new Map();
     playsList = Array.isArray(deps.plays) ? deps.plays : [];
     commentaryConfig = deps.commentaryInterestConfig || null;
+    onStateChange = typeof deps.onStateChange === 'function' ? deps.onStateChange : null;
     escapeHTML = deps.escapeHTML || window.escapeHTML || escapeHTML;
     bookOrder = new Map();
     bookEnglishNames = new Map();
@@ -799,4 +859,11 @@
 
   window.isCommentaryDetailCell = isCommentaryDetailCell;
   window.buildCommentaryDetailLink = buildCommentaryDetailLink;
+  window.getCommentaryDetailParam = () => currentDetailParam;
+  window.openCommentaryDetailFromParam = function (value) {
+    const parsed = paramToScope(value);
+    if (!parsed) return false;
+    openScope(parsed.scope, parsed.commentatorKey, 0);
+    return true;
+  };
 })();

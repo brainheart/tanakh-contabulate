@@ -592,6 +592,10 @@
     if (sortKey) p.set('sk', sortKey);
     if (sortDir) p.set('sd', sortDir);
     if (segmentsColumnOrder.length) p.set('co', segmentsColumnOrder.join(','));
+    const commentaryParam = (typeof window.getCommentaryDetailParam === 'function')
+      ? window.getCommentaryDetailParam()
+      : '';
+    if (commentaryParam) p.set('cm', commentaryParam);
     // Segment column filters (only for current granularity)
     const segFilters = getSegmentsFiltersMap();
     for (const [key, v] of segFilters.entries()) {
@@ -2435,7 +2439,11 @@
     window.initPlayDetail({ chunks, tokens, tokens2, tokens3, playsById, chunkById, characters, characterNameFilterConfig, escapeHTML });
   }
   if (typeof window.initCommentaryDetail === 'function') {
-    window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML });
+    window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML, onStateChange: updateDeepLink });
+    const commentaryParam = new URLSearchParams(location.search).get('cm');
+    if (commentaryParam && typeof window.openCommentaryDetailFromParam === 'function') {
+      window.openCommentaryDetailFromParam(commentaryParam);
+    }
   }
   if (typeof window.initAddColumnPopover === 'function') {
     window.initAddColumnPopover({

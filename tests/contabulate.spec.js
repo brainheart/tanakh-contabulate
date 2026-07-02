@@ -80,6 +80,15 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await expect(page.locator('#linesResults td.line-text').first()).toHaveCSS('direction', 'rtl');
 });
 
+test('opens the commentary modal from a cm deep link', async ({ page }) => {
+  await page.goto('/?cm=Gen.1.1~rashi');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeVisible();
+  await expect(page.locator('#commentaryDetailTitle')).toContainText('Rashi');
+  await expect(page.locator('.commentary-detail-table tbody tr').first()).toBeVisible();
+  await page.locator('.commentary-detail-close').click();
+});
+
 test('maps legacy verse URL granularities to text-backed Verse view', async ({ page }) => {
   await page.goto('/?q=%D7%90%D7%9C%D7%94%D7%99%D7%9D&nm=1&gran=line&mm=exact&sk=location&sd=asc&cs=1&zr=0&hl=1');
   await page.waitForFunction(() => window.__contabulateReady === true);

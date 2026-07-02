@@ -287,13 +287,6 @@ td.ranked-cell {
   font-size: 1.2rem;
   font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
 }
-.query-input-lines {
-  flex: 1;
-  min-width: 20rem;
-  font-size: 1.2rem;
-  padding: 0.5rem;
-  font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
-}
 .hebrew-inline {
   font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
 }
@@ -438,33 +431,6 @@ input[type="checkbox"] {
   height: 1.1rem;
   cursor: pointer;
 }
-.tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--border);
-}
-.tab-btn {
-  padding: 0.7rem 1.2rem;
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: var(--ink);
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-  margin-bottom: -2px;
-}
-.tab-btn:hover {
-  background: rgba(139, 21, 56, 0.05);
-  color: var(--burgundy);
-}
-.tab-btn.active {
-  color: var(--burgundy);
-  border-bottom-color: var(--burgundy);
-  background: transparent;
-}
 .tab-content {
   margin-top: 0;
 }
@@ -556,19 +522,6 @@ input[type="checkbox"] {
   .add-column-btn.idle-shimmer::after {
     animation: none;
   }
-}
-.line-text {
-  font-style: normal;
-  max-width: 600px;
-  line-height: 1.5;
-  direction: rtl;
-  text-align: right;
-  unicode-bidi: bidi-override;
-  font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
-}
-.line-text .hit {
-  font-style: normal;
-  font-weight: 600;
 }
 /* Hide advanced color scale controls for now */
 .color-scale-options { display: none; }
@@ -1124,8 +1077,7 @@ td.add-column-cell {
   .control-group {
     width: 100%;
   }
-  .query-input,
-  .query-input-lines {
+  .query-input {
     min-width: 0;
     flex: 1 1 100%;
   }

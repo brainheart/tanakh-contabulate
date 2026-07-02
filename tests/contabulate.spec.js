@@ -62,22 +62,14 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await page.locator('.commentary-detail-close').click();
   await page.selectOption('#gran', 'line');
 
-  await page.evaluate(() => {
-    const tabs = document.querySelector('.tabs');
-    tabs.classList.remove('is-hidden');
-    tabs.style.display = 'flex';
-  });
-  await page.locator('.tab-btn[data-tab="lines"]').click();
-  await page.fill('#linesQuery', 'אלהים');
-  await page.press('#linesQuery', 'Enter');
-
-  await expect(page.locator('#linesTableBody tr')).toHaveCount(50);
-  const linesHeaders = await page.locator('#linesResults thead th').allTextContents();
-  expect(linesHeaders.some((text) => text.includes('# comments'))).toBeTruthy();
-  expect(linesHeaders.some((text) => text.includes('Verse #'))).toBeTruthy();
-  expect(linesHeaders.some((text) => text.includes('Verse'))).toBeTruthy();
-  await expect(page.locator('#linesTableBody')).toContainText('אֱלֹהִ');
-  await expect(page.locator('#linesResults td.line-text').first()).toHaveCSS('direction', 'rtl');
+  // Word & phrase columns: add a term column at Verse granularity
+  await page.fill('#q', 'אלהים');
+  await page.locator('#addColumnBtn').click();
+  await page.waitForSelector('#results tbody tr');
+  const termHeaders = await page.locator('#results thead th').allTextContents();
+  expect(termHeaders.some((text) => text.includes('אלהים'))).toBeTruthy();
+  expect(termHeaders.some((text) => text.includes('Verse'))).toBeTruthy();
+  await expect(page.locator('#results tbody')).toContainText('אֱלֹהִ');
 });
 
 test('opens the commentary modal from a cm deep link', async ({ page }) => {

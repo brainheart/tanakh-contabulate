@@ -24,11 +24,6 @@
   <h1><a href="https://contabulate.org/">Contabulate</a>: 🕎 <span class="hebrew-inline" dir="rtl">תנ״ך</span> — Hebrew Bible Tabular Explorer</h1>
   <p class="muted">A sortable, filterable table of the Tanakh — by section, book, chapter, or verse. Add three kinds of columns: Hebrew word, bigram, and trigram counts (type a term below — exact matching ignores nikud but keeps pointed text in the results); commentator attention from centuries of commentary, where every count clicks through to the comments themselves; and text metrics like sentence length and lexical rarity. The last two live under the <strong>+</strong> at the right edge of the table. Source text courtesy of <a href="https://github.com/openscriptures/morphhb" target="_blank" rel="noopener">Open Scriptures morphhb</a> and the Westminster Leningrad Codex; commentary counts derived from <a href="https://github.com/Sefaria/Sefaria-Export" target="_blank" rel="noopener">Sefaria-Export</a>.</p>
 
-  <div class="tabs is-hidden">
-    <button class="tab-btn active" data-tab="segments">Rows are Contexts</button>
-    <button class="tab-btn" data-tab="lines">Rows are Verses</button>
-  </div>
-
   <div class="tab-content" id="segmentsTab">
     <div class="controls">
       <div class="controls-row">
@@ -129,82 +124,6 @@
     </div>
   </div>
 
-  <div class="tab-content is-hidden" id="linesTab">
-    <div class="controls">
-      <div class="controls-row">
-        <span class="label-strong">Show verses with</span>
-        <select id="linesNgramMode" class="control-select">
-          <option value="1" selected>single word</option>
-          <option value="2">bigram</option>
-          <option value="3">trigram</option>
-        </select>
-        <span class="label-strong">matching the</span>
-        <select id="linesMatchMode" class="control-select">
-          <option value="exact">exact term</option>
-          <option value="regex">regex pattern</option>
-        </select>
-        <input type="text" class="query-input-lines" id="linesQuery" dir="auto" placeholder="e.g., אלהים, ^ברא$, יהוה אלהים" value="">
-      </div>
-    </div>
-
-    <details>
-      <summary class="sr"><strong>Display options</strong></summary>
-      <div class="options-row">
-        <label><input type="checkbox" class="color-scale-toggle" checked> Color scale numeric columns</label>
-        <label><input type="checkbox" class="highlight-toggle" checked> Highlight matching verse text</label>
-        <button id="downloadLinesCsv" class="download-btn" type="button">Download CSV</button>
-        <div class="color-scale-options">
-          <label>Palette:
-            <select class="color-scale-palette">
-              <option value="blue-diverging" selected>Gray ↔ Blue (default)</option>
-              <option value="blue-linear">Gray ↔ Blue (alt)</option>
-              <option value="burgundy-gold">Gold ↔ Burgundy</option>
-            </select>
-          </label>
-          <label>Steps:
-            <select class="color-scale-steps">
-              <option value="5" selected>5</option>
-              <option value="7">7</option>
-            </select>
-          </label>
-        </div>
-      </div>
-      <div class="color-scale-legend"></div>
-      <div class="deep-link-wrap">
-        <strong>Deep Link:</strong>
-        <a class="deep-link" href="#" target="_blank" rel="noopener"></a>
-        <button type="button" class="copy-deep-link link-btn">Copy</button>
-      </div>
-    </details>
-
-    <table id="linesResults">
-      <thead><tr id="linesHeadRow"></tr></thead>
-      <tbody id="linesTableBody"></tbody>
-    </table>
-    <div id="linesFilterActions" class="filter-actions is-hidden">
-      <button id="clearLinesFilters" class="link-btn link-btn-no-padding">Clear all filters for this view</button>
-      <span class="muted filters-info" id="linesFiltersInfo"></span>
-    </div>
-
-    <div class="pagination is-hidden" id="linesPagination">
-      <button id="linesFirstPage">First</button>
-      <button id="linesPrevPage">Prev</button>
-      <span class="page-info" id="linesPageInfo">Page 1 of 1</span>
-      <button id="linesNextPage">Next</button>
-      <button id="linesLastPage">Last</button>
-      <label>
-        Rows per page:
-        <select id="linesPageSize">
-          <option value="25">25</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-          <option value="250">250</option>
-        </select>
-      </label>
-      <span class="page-info" id="linesTotalInfo"></span>
-    </div>
-  </div>
-
 <script src="js/utils.js"></script>
 <script src="js/table-ui.js"></script>
 <script src="js/filter-popover.js"></script>
@@ -212,7 +131,6 @@
 <script src="js/play-detail.js"></script>
 <script src="js/commentary-detail.js"></script>
 <script src="js/add-column-popover.js"></script>
-<script src="js/lines-tab.js"></script>
 <script>
 (async function() {
   window.__contabulateReady = false;
@@ -532,7 +450,6 @@
   }
   // Sort state defaults (declare before deep-link logic uses them)
   let sortKey = null, sortDir = 'desc';
-  let linesTabController = null;
   let segmentsColumnOrder = [];
   let segmentsColumnDefs = [];
   // Column filters maps (declare early for deep-link)
@@ -679,26 +596,6 @@
       setElementHidden(container, true);
     }
   }
-  // Tab switching
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const segmentsTab = document.getElementById('segmentsTab');
-  const linesTab = document.getElementById('linesTab');
-  
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetTab = btn.dataset.tab;
-      tabBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      
-      setElementHidden(segmentsTab, targetTab !== 'segments');
-      setElementHidden(linesTab, targetTab !== 'lines');
-      if (targetTab === 'lines' && typeof ensureAllLinesLoaded === 'function') {
-        ensureAllLinesLoaded().catch(() => {});
-      }
-      updateDeepLink();
-    });
-  });
-
   const loadingIndicator = document.getElementById('loadingIndicator');
   const loadingMessage = document.getElementById('loadingMessage');
 
@@ -780,20 +677,6 @@
   const chunkById = new Map(chunks.map(r => [r.scene_id, r]));
   const playsById = new Map(plays.map(p => [p.play_id, p]));
   const charactersById = new Map(characters.map(c => [c.character_id, c]));
-
-  // Lines tab controller — loaded from js/lines-tab.js
-  if (typeof createLinesTabController === 'function') {
-    linesTabController = createLinesTabController({
-      getAllLines: () => allLines,
-      getPlaysById: () => playsById,
-      colorScaleState: colorScaleState,
-      showFilterPopover: showFilterPopover,
-      applyOrClear: applyOrClear,
-      updateDeepLink: updateDeepLink,
-      ensureAllLinesLoaded: ensureAllLinesLoaded
-    });
-    linesTabController.init();
-  }
 
   // Name normalization util used elsewhere
 
@@ -1163,11 +1046,6 @@
         if (typeof st.display.highlightEnabled === 'boolean') colorScaleState.highlightEnabled = st.display.highlightEnabled;
         syncColorScaleToggles(); syncColorScaleOptions(); syncHighlightToggles();
       }
-      // Tab
-      if (st.tab) {
-        const btn = document.querySelector(`.tab-btn[data-tab="${st.tab}"]`);
-        if (btn) btn.click();
-      }
       // Segments
       if (st.segments) {
       if (st.segments.q != null) q.value = st.segments.q;
@@ -1194,27 +1072,9 @@
           for (const [k,v] of m.entries()) getSegmentsFiltersMap().set(normalizeSegmentsColumnKey(k), v);
         }
       }
-      // Lines
-      if (st.lines) {
-        const lq = document.getElementById('linesQuery');
-        if (st.lines.q != null) lq.value = st.lines.q;
-        const ln = document.getElementById('linesNgramMode');
-        if (st.lines.ngramMode) ln.value = st.lines.ngramMode;
-        const lm = document.getElementById('linesMatchMode');
-        if (st.lines.matchMode) lm.value = st.lines.matchMode;
-        if (linesTabController && (st.lines.sortKey || st.lines.sortDir)) {
-          linesTabController.setSortState(st.lines.sortKey, st.lines.sortDir);
-        }
-        if (linesTabController) linesTabController.replaceColumnFilters(new Map());
-        if (st.lines.filters) {
-          const m2 = arrayToMap(st.lines.filters);
-          if (linesTabController) linesTabController.replaceColumnFilters(m2);
-        }
-      }
       updateSegmentsMatchModeUI();
       // Trigger renders
       doSearch();
-      const lqv = document.getElementById('linesQuery').value.trim(); if (lqv) doLinesSearch();
       applyColorScalesForVisibleTables();
       appliedDeepLinkState = true;
     } catch(e) { /* ignore */ }
@@ -1244,11 +1104,6 @@
     }
     downloadCsv(filename, rows);
   }
-  function downloadLinesCsvAll(filename) {
-    if (!linesTabController) return;
-    linesTabController.downloadCsvAll(filename);
-  }
-
   // Simple debounce helper for responsive UI without spamming renders
 
 
@@ -2042,21 +1897,11 @@
   // Column filter popover — loaded from js/filter-popover.js
   if (typeof window.initFilterPopoverModule === 'function') {
     window.initFilterPopoverModule({
-      getStateMap: (table) => (table === 'lines'
-        ? (linesTabController ? linesTabController.getColumnFilters() : new Map())
-        : getSegmentsFiltersMap()),
-      applyTableFilters: (table) => {
-        if (table === 'lines') {
-          if (linesTabController) {
-            linesTabController.renderPage();
-            linesTabController.updateFilterActions();
-          }
-          updateDeepLink();
-        } else {
-          refreshSegmentsFromFilters();
-          updateSegmentsFilterActions();
-          updateDeepLink();
-        }
+      getStateMap: () => getSegmentsFiltersMap(),
+      applyTableFilters: () => {
+        refreshSegmentsFromFilters();
+        updateSegmentsFilterActions();
+        updateDeepLink();
       }
     });
   }
@@ -2345,9 +2190,6 @@
   document.querySelectorAll('.highlight-toggle').forEach(cb => {
     cb.addEventListener('change', (e) => {
       setHighlightEnabled(e.target.checked);
-      if (linesTabController && typeof linesTabController.renderPage === 'function') {
-        linesTabController.renderPage();
-      }
       updateDeepLink();
     });
   });
@@ -2392,12 +2234,6 @@
     });
   }
 
-  // Lines tab controller wrapper (module in docs/js/lines-tab.js)
-  function doLinesSearch() {
-    if (!linesTabController) return;
-    linesTabController.doSearch();
-  }
-
   // initial state for contexts tab (only if no deep link state applied)
   if (!appliedDeepLinkState) {
     gran.value = 'play';
@@ -2405,16 +2241,6 @@
   }
   scheduleAllLinesPreload();
 
-  // Local testing override: force a tab open without affecting normal defaults/deep links
-  (function applyShowTabOverride() {
-    const sp = new URLSearchParams(location.search);
-    const forcedTab = (sp.get('showtab') || '').trim();
-    if (!forcedTab) return;
-    if (forcedTab !== 'segments' && forcedTab !== 'lines') return;
-    const btn = document.querySelector(`.tab-btn[data-tab="${forcedTab}"]`);
-    if (btn) btn.click();
-  })();
-  
   // Color Scale Module — loaded from js/color-scale.js
   // Initialize with dependencies
   if (typeof window.initColorScaleModule === 'function') {
@@ -2424,13 +2250,7 @@
         if (q && q.value && q.value.trim()) return true;
         return getActiveTerms().length > 0;
       },
-      getLinesQueryValue: () => document.getElementById('linesQuery').value,
-      hasActiveLinesSearch: () => {
-        const linesQuery = document.getElementById('linesQuery');
-        return !!(linesQuery && linesQuery.value && linesQuery.value.trim());
-      },
-      doSearch: doSearch,
-      doLinesSearch: doLinesSearch 
+      doSearch: doSearch
     });
   }
   

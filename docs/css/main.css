@@ -188,6 +188,25 @@ td.ranked-cell {
   align-items: center;
   gap: 0.5rem;
   font-size: 1.05rem;
+  /* .controls is itself a flex container; make each row span it and shrink */
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.control-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.control-group-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.control-divider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 1.6rem;
+  background: var(--border);
 }
 .add-column-btn {
   position: relative;
@@ -438,6 +457,7 @@ input[type="checkbox"] {
 }
 .pagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
   margin-top: 1rem;
@@ -1060,9 +1080,16 @@ td.add-column-cell {
   .controls-row {
     align-items: stretch;
   }
+  .control-divider {
+    display: none;
+  }
+  .control-group {
+    width: 100%;
+  }
   .query-input,
   .query-input-lines {
-    min-width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
   }
   table {
     display: block;

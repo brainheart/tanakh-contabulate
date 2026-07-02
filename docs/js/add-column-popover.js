@@ -194,7 +194,7 @@
 
     const footer = document.createElement('div');
     footer.className = 'add-column-footer';
-    footer.appendChild(document.createTextNode('Word and phrase columns: '));
+    footer.appendChild(document.createTextNode('Word & phrase columns: '));
     const searchLink = document.createElement('button');
     searchLink.type = 'button';
     searchLink.className = 'link-btn link-btn-no-padding';

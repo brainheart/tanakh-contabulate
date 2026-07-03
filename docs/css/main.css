@@ -199,7 +199,9 @@ td.ranked-cell {
   gap: 0.5rem;
 }
 .control-group-grow {
-  flex: 1 1 auto;
+  /* Zero basis so the group shares the toolbar line and squeezes (its own
+     contents wrap internally) instead of dropping to a new line whole. */
+  flex: 1 1 0;
   min-width: 0;
 }
 .control-divider {
@@ -283,7 +285,7 @@ td.ranked-cell {
 }
 .query-input {
   flex: 1;
-  min-width: 20rem;
+  min-width: 13rem;
   font-size: 1.2rem;
   font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
 }

@@ -10,6 +10,7 @@ The generated site lives in [docs](/Users/klaus/Projects/tanakh-contabulate/docs
 - Westminster Leningrad Codex text contained in the `source_text/*.xml` OSIS files
 - Morphological markup is stripped down to plain Hebrew verse text for display; search indexes normalize Hebrew by removing nikud and cantillation marks
 - Commentary-interest counts are generated from Sefaria-Export Tanakh commentary data: https://github.com/Sefaria/Sefaria-Export
+- The book n-gram modal's "configured names" exclusion lists are extracted from morphhb morphology (proper-noun `Np` segments, including attested prefixed forms); users can tweak them per book in the UI, with edits kept in the browser's localStorage.
 
 ## Build
 

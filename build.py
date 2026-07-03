@@ -131,6 +131,25 @@ def extract_word_text(word_elem: ET.Element) -> str:
     return normalize_display_ws(text)
 
 
+# Proper-noun segment in a morphhb morph code ("HNp", "HR/Np", "HC/R/Np", ...).
+NAME_MORPH_RE = re.compile(r"(?:^|/)[HA]?Np")
+
+
+def extract_proper_name_tokens(xml_path: Path) -> set[str]:
+    """Word forms (including attached prefixes) whose morphology contains a
+    proper-noun segment, normalized like search tokens so they match the
+    n-gram indexes exactly."""
+    root = ET.parse(xml_path).getroot()
+    names = set()
+    for word_elem in root.findall(".//osis:w", NS):
+        morph = word_elem.attrib.get("morph", "")
+        if not NAME_MORPH_RE.search(morph):
+            continue
+        for token in tokenize_hebrew(extract_word_text(word_elem)):
+            names.add(token)
+    return names
+
+
 def seg_text(seg_elem: ET.Element) -> str:
     text = normalize_display_ws("".join(seg_elem.itertext()))
     seg_type = seg_elem.attrib.get("type")
@@ -295,6 +314,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
     tokens3 = defaultdict(list)
 
     verse_id = 0
+    name_filter_play_additions = {}
 
     for book_id, (_, _, abbr, _, _) in enumerate(BOOK_ORDER, start=1):
         meta = BOOK_META[abbr]
@@ -304,6 +324,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
             raise FileNotFoundError(f"Missing source book: {xml_path}")
 
         verses = parse_book(xml_path)
+        name_filter_play_additions[abbr] = sorted(extract_proper_name_tokens(xml_path))
         book_total_words = 0
         book_tokens = []  # ordered token stream for book-level MATTR
         book_commentary_fields = empty_commentary_fields(commentary_columns)
@@ -450,7 +471,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
         {
             "global_additions": [],
             "global_removals": [],
-            "play_additions": {},
+            "play_additions": name_filter_play_additions,
             "play_removals": {},
         },
     )

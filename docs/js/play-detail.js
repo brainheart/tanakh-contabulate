@@ -4,7 +4,8 @@
 (function () {
   'use strict';
 
-  const NAME_TOKEN_RE = /[a-z]+/g;
+  const NAME_TOKEN_RE = /[a-zא-ת]+/g;
+  const NAME_FILTER_OVERRIDES_KEY = 'tanakhNameFilterOverrides';
   const GENERIC_CHARACTER_NAME_TOKENS = new Set([
     'all', 'and', 'both', 'boy', 'captain', 'chorus', 'citizen', 'citizens', 'clown',
     'constable', 'doctor', 'duke', 'earl', 'epilogue', 'first', 'fool', 'fourth', 'gentleman',
@@ -17,6 +18,8 @@
   ]);
 
   let sceneToPlayId, playShapeById, chunkById, playsById, tokens, tokens2, tokens3, escapeHTML, characterNameFiltersByPlay;
+  let charactersRef = [];
+  let nameFilterConfigRef = null;
   const setElementHidden = window.setElementHidden || ((el, hidden) => {
     if (!el || !el.classList) return;
     el.classList.toggle('is-hidden', !!hidden);
@@ -29,6 +32,7 @@
     sortKey: 'count',
     sortDir: 'desc',
     excludeCharacterNames: true,
+    filterDetailsOpen: false,
     threshold: 0,
     currentPage: 1,
     pageSize: 50,
@@ -164,6 +168,143 @@
       addAutoDetectedName(filter, ch.name);
     }
     return applyCharacterNameFilterConfig(byPlay, playsByIdMap, config);
+  }
+
+  // --- User overrides (localStorage) layered on top of the built-in config ---
+
+  function loadNameFilterOverrides() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(NAME_FILTER_OVERRIDES_KEY) || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveNameFilterOverrides(overrides) {
+    try {
+      localStorage.setItem(NAME_FILTER_OVERRIDES_KEY, JSON.stringify(overrides));
+    } catch (_) { /* private mode etc. — edits just won't persist */ }
+  }
+
+  function normalizeFilterTerm(term) {
+    const toks = tokenizeName(term);
+    if (!toks.length || toks.length > 3) return '';
+    return toks.join(' ');
+  }
+
+  function playAbbrForId(playId) {
+    const play = playsById && playsById.get(playId);
+    return play && play.abbr ? String(play.abbr) : String(playId);
+  }
+
+  function getPlayOverrides(playId) {
+    const all = loadNameFilterOverrides();
+    const entry = all[playAbbrForId(playId)];
+    return {
+      added: Array.isArray(entry && entry.added) ? entry.added : [],
+      removed: Array.isArray(entry && entry.removed) ? entry.removed : []
+    };
+  }
+
+  function hasPlayOverrides(playId) {
+    const o = getPlayOverrides(playId);
+    return o.added.length > 0 || o.removed.length > 0;
+  }
+
+  function rebuildNameFilters() {
+    characterNameFiltersByPlay = buildCharacterNameTokensByPlay(charactersRef, playsById, nameFilterConfigRef);
+    for (const playId of playsById.keys()) {
+      const filter = ensureCharacterNameFilter(characterNameFiltersByPlay, playId);
+      const o = getPlayOverrides(playId);
+      o.added.forEach(term => addConfigName(filter, term));
+      o.removed.forEach(term => removeConfigName(filter, term));
+    }
+  }
+
+  function isTermExcluded(playId, phrase) {
+    const filter = characterNameFiltersByPlay && characterNameFiltersByPlay.get(playId);
+    if (!filter) return false;
+    const toks = phrase.split(' ');
+    const phraseSet = filter.phrasesByN[toks.length];
+    if (phraseSet && phraseSet.has(phrase)) return true;
+    return toks.length === 1 && filter.tokens.has(phrase);
+  }
+
+  function mutatePlayOverrides(playId, mutate) {
+    const abbr = playAbbrForId(playId);
+    const all = loadNameFilterOverrides();
+    const entry = all[abbr] || { added: [], removed: [] };
+    entry.added = Array.isArray(entry.added) ? entry.added : [];
+    entry.removed = Array.isArray(entry.removed) ? entry.removed : [];
+    mutate(entry);
+    if (entry.added.length || entry.removed.length) all[abbr] = entry;
+    else delete all[abbr];
+    saveNameFilterOverrides(all);
+    rebuildNameFilters();
+  }
+
+  function excludeNameTerm(playId, rawTerm) {
+    const phrase = normalizeFilterTerm(rawTerm);
+    if (!phrase) return false;
+    // Drop any removal override first; only record an explicit addition if
+    // the built-in config still leaves the term unexcluded.
+    mutatePlayOverrides(playId, (entry) => {
+      entry.removed = entry.removed.filter(t => normalizeFilterTerm(t) !== phrase);
+    });
+    if (!isTermExcluded(playId, phrase)) {
+      mutatePlayOverrides(playId, (entry) => {
+        if (!entry.added.some(t => normalizeFilterTerm(t) === phrase)) entry.added.push(phrase);
+      });
+    }
+    refreshPlayNameFilter(playId);
+    return true;
+  }
+
+  function includeNameTerm(playId, rawTerm) {
+    const phrase = normalizeFilterTerm(rawTerm);
+    if (!phrase) return false;
+    mutatePlayOverrides(playId, (entry) => {
+      entry.added = entry.added.filter(t => normalizeFilterTerm(t) !== phrase);
+    });
+    if (isTermExcluded(playId, phrase)) {
+      mutatePlayOverrides(playId, (entry) => {
+        if (!entry.removed.some(t => normalizeFilterTerm(t) === phrase)) entry.removed.push(phrase);
+      });
+    }
+    refreshPlayNameFilter(playId);
+    return true;
+  }
+
+  function resetNameOverrides(playId) {
+    const all = loadNameFilterOverrides();
+    delete all[playAbbrForId(playId)];
+    saveNameFilterOverrides(all);
+    rebuildNameFilters();
+    refreshPlayNameFilter(playId);
+  }
+
+  function refreshPlayNameFilter(playId) {
+    const cached = playDetailCache.get(playId);
+    if (cached) {
+      for (const n of [1, 2, 3]) {
+        for (const row of cached.rowsByN[n]) {
+          row.containsCharacterName = ngramContainsCharacterName(row.ngram, playId);
+        }
+        const noNames = cached.rowsByN[n].filter(row => !row.containsCharacterName);
+        cached.rowsByNNoNames[n] = noNames;
+        cached.maxByNNoNames[n] = maxTfIdfFromRows(noNames);
+      }
+    }
+    if (playDetailState.playId === playId && cached && playDetailEls) {
+      playDetailState.rowsByN = cached.rowsByN;
+      playDetailState.maxByN = cached.maxByN;
+      playDetailState.rowsByNNoNames = cached.rowsByNNoNames;
+      playDetailState.maxByNNoNames = cached.maxByNNoNames;
+      playDetailEls.updateSliderUi();
+      playDetailEls.renderFilterDisclosure();
+      playDetailEls.renderRows();
+    }
   }
 
   function ngramContainsCharacterName(ngram, playId) {
@@ -353,7 +494,7 @@
 
       const playId = playDetailState.playId;
       const play = playsById && playsById.get(playId);
-      const playLabel = (play && (play.title || play.abbr)) || 'this play';
+      const playLabel = (play && (play.title || play.abbr)) || 'this book';
       const display = getPlayFilterDisplayData(playId);
 
       if (!playDetailState.excludeCharacterNames) {
@@ -362,23 +503,26 @@
         return;
       }
 
-      const tokenList = display.tokens.length
-        ? escapeHTML(display.tokens.join(', '))
-        : '<span class="muted">None</span>';
-      const phraseList = display.phrases.length
-        ? display.phrases.map(phrase => `&quot;${escapeHTML(phrase)}&quot;`).join(', ')
-        : '<span class="muted">None</span>';
+      const terms = [...display.tokens, ...display.phrases];
+      const chips = terms.length
+        ? terms.map(term => (
+          `<button type="button" class="excluded-term-chip" data-term="${escapeHTML(term)}" dir="auto"` +
+          ` title="Stop excluding this term">${escapeHTML(term)}<span class="chip-x" aria-hidden="true">×</span></button>`
+        )).join('')
+        : '<span class="muted">No excluded terms.</span>';
+      const resetBtn = hasPlayOverrides(playId)
+        ? '<button type="button" class="link-btn excluded-terms-reset">Reset to defaults</button>'
+        : '';
 
       filterDisclosureEl.innerHTML = `
-        <details class="excluded-terms-details">
-          <summary>Filtering ${display.total} terms for ${escapeHTML(playLabel)}</summary>
-          <div class="excluded-terms-group">
-            <span class="excluded-terms-label">Single tokens</span>
-            <span class="excluded-terms-list">${tokenList}</span>
-          </div>
-          <div class="excluded-terms-group">
-            <span class="excluded-terms-label">Phrases</span>
-            <span class="excluded-terms-list">${phraseList}</span>
+        <details class="excluded-terms-details"${playDetailState.filterDetailsOpen ? ' open' : ''}>
+          <summary>Filtering ${display.total.toLocaleString('en-US')} terms for ${escapeHTML(playLabel)}</summary>
+          <div class="excluded-terms-hint muted">Names come from the morphhb proper-noun tagging; click a term to stop excluding it, or use the × on any n-gram row below to exclude more. Edits are saved in this browser.</div>
+          <div class="excluded-terms-chips">${chips}</div>
+          <div class="excluded-terms-edit">
+            <input type="text" class="excluded-terms-input" dir="auto" placeholder="Term to exclude (1–3 words)">
+            <button type="button" class="link-btn excluded-terms-add">Exclude</button>
+            ${resetBtn}
           </div>
         </details>
       `;
@@ -419,11 +563,15 @@
       const html = [];
       for (let i = 0; i < pageRows.length; i++) {
         const row = pageRows[i];
+        const excluded = !!row.containsCharacterName;
+        const action = excluded
+          ? `<button type="button" class="ngram-exclude-btn" data-ngram="${escapeHTML(row.ngram)}" data-excluded="1" title="Re-include this term in the lists">+</button>`
+          : `<button type="button" class="ngram-exclude-btn" data-ngram="${escapeHTML(row.ngram)}" title="Exclude this term from the lists">×</button>`;
         html.push(
-          `<tr>` +
+          `<tr${excluded ? ' class="pd-name-excluded"' : ''}>` +
           `<td>${pageStart + i + 1}</td>` +
-          `<td>${escapeHTML(row.ngram)}</td>` +
-          `<td>${row.count}</td>` +
+          `<td><span dir="auto">${escapeHTML(row.ngram)}</span>${action}</td>` +
+          `<td>${typeof window.formatCellNumber === 'function' ? window.formatCellNumber(row.count) : row.count}</td>` +
           `<td>${row.tfidf.toFixed(4)}</td>` +
           `</tr>`
         );
@@ -465,6 +613,36 @@
         updateSliderUi();
         renderFilterDisclosure();
         renderRows();
+      });
+    }
+
+    if (filterDisclosureEl) {
+      filterDisclosureEl.addEventListener('toggle', (e) => {
+        if (e.target && e.target.classList.contains('excluded-terms-details')) {
+          playDetailState.filterDetailsOpen = !!e.target.open;
+        }
+      }, true);
+      filterDisclosureEl.addEventListener('click', (e) => {
+        const chip = e.target.closest('.excluded-term-chip');
+        if (chip) {
+          includeNameTerm(playDetailState.playId, chip.dataset.term || '');
+          return;
+        }
+        if (e.target.closest('.excluded-terms-add')) {
+          const input = filterDisclosureEl.querySelector('.excluded-terms-input');
+          if (input && excludeNameTerm(playDetailState.playId, input.value)) input.value = '';
+          return;
+        }
+        if (e.target.closest('.excluded-terms-reset')) {
+          resetNameOverrides(playDetailState.playId);
+        }
+      });
+      filterDisclosureEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const input = e.target.closest('.excluded-terms-input');
+        if (!input) return;
+        e.preventDefault();
+        if (excludeNameTerm(playDetailState.playId, input.value)) input.value = '';
       });
     }
 
@@ -531,6 +709,15 @@
         renderRows();
       });
     }
+
+    tbodyEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.ngram-exclude-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const term = btn.dataset.ngram || '';
+      if (btn.dataset.excluded) includeNameTerm(playDetailState.playId, term);
+      else excludeNameTerm(playDetailState.playId, term);
+    });
 
     closeBtn.addEventListener('click', closePlayDetailModal);
     overlay.addEventListener('click', (e) => {
@@ -632,6 +819,7 @@
     playDetailState.sortKey = 'count';
     playDetailState.sortDir = 'desc';
     playDetailState.excludeCharacterNames = true;
+    playDetailState.filterDetailsOpen = false;
     playDetailState.threshold = 0;
     playDetailState.rowsByN = { 1: [], 2: [], 3: [] };
     playDetailState.maxByN = { 1: 0, 2: 0, 3: 0 };
@@ -644,7 +832,8 @@
     const chapters = shape.acts.size || play.num_acts || 0;
 
     modal.titleEl.textContent = play.title || play.abbr || 'Unknown book';
-    modal.metaEl.textContent = `${play.genre || 'Unknown section'} \u00b7 ${totalWords} words \u00b7 ${totalVerses} verses \u00b7 ${chapters} chapters`;
+    const fmt = (n) => (typeof window.formatCellNumber === 'function' ? window.formatCellNumber(n) : n);
+    modal.metaEl.textContent = `${play.genre || 'Unknown section'} \u00b7 ${fmt(totalWords)} words \u00b7 ${fmt(totalVerses)} verses \u00b7 ${fmt(chapters)} chapters`;
     if (typeof window.applyDirectionalText === 'function') {
       window.applyDirectionalText(modal.titleEl, { mixed: true });
       window.applyDirectionalText(modal.metaEl);
@@ -703,11 +892,9 @@
     tokens2 = deps.tokens2;
     tokens3 = deps.tokens3;
     escapeHTML = deps.escapeHTML;
-    characterNameFiltersByPlay = buildCharacterNameTokensByPlay(
-      deps.characters || [],
-      playsById,
-      deps.characterNameFilterConfig || null
-    );
+    charactersRef = deps.characters || [];
+    nameFilterConfigRef = deps.characterNameFilterConfig || null;
+    rebuildNameFilters();
   };
 
   window.isPlayDetailCell = isPlayDetailCell;

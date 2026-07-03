@@ -72,6 +72,30 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await expect(page.locator('#results tbody')).toContainText('אֱלֹהִ');
 });
 
+test('book ngram modal lists configured names and supports editing', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+  await page.locator('#results .play-detail-link', { hasText: 'Ruth' }).click();
+  await page.waitForSelector('#playDetailTable:not(.is-hidden)', { timeout: 30000 });
+
+  await expect(page.locator('.excluded-terms-details summary')).toContainText('Filtering 50 terms');
+  await page.locator('.excluded-terms-details summary').click();
+  await expect(page.locator('.excluded-term-chip', { hasText: 'בעז' }).first()).toBeVisible();
+
+  // Exclude the top n-gram from the row button; it disappears and persists
+  const firstNgram = (await page.locator('#playDetailTableBody tr td:nth-child(2) span').first().textContent()).trim();
+  await page.locator('#playDetailTableBody .ngram-exclude-btn').first().click();
+  const topAfter = await page.locator('#playDetailTableBody tr td:nth-child(2) span').allTextContents();
+  expect(topAfter.map(t => t.trim())).not.toContain(firstNgram);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('tanakhNameFilterOverrides')));
+  expect(stored.Ruth.added).toContain(firstNgram);
+
+  // Reset restores the built-in list
+  await page.locator('.excluded-terms-reset').click();
+  await expect(page.locator('.excluded-terms-details summary')).toContainText('Filtering 50 terms');
+  await page.locator('.play-detail-close').click();
+});
+
 test('opens the commentary modal from a cm deep link', async ({ page }) => {
   await page.goto('/?cm=Gen.1.1~rashi');
   await page.waitForFunction(() => window.__contabulateReady === true);

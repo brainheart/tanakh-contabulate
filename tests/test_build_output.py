@@ -83,6 +83,19 @@ def test_commentary_summary_and_book_totals():
     assert detail_total == plays[0]["commentary_interest"]
 
 
+def test_name_filter_config_lists_proper_nouns_per_book():
+    config = load_json(DATA / "character_name_filter_config.json")
+    additions = config["play_additions"]
+    assert len(additions) == 39
+    assert "אברהם" in additions["Gen"]
+    # Prefixed surface forms are included so they match the n-gram indexes.
+    assert "לאברהם" in additions["Gen"]
+    assert "בעז" in additions["Ruth"]
+    assert len(additions["Gen"]) > 300
+    # Common nouns must not leak into the name lists.
+    assert "אלהים" not in additions["Gen"]
+
+
 def test_token_indexes_include_common_hebrew_terms():
     tokens = load_json(DATA / "tokens.json")
     tokens2 = load_json(DATA / "tokens2.json")

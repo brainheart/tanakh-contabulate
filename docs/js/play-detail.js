@@ -373,6 +373,7 @@
       <div class="play-detail-modal" role="dialog" aria-modal="true" aria-label="Book detail">
         <div class="play-detail-head">
           <button type="button" class="play-detail-close" aria-label="Close">×</button>
+          <div class="play-detail-kicker">Words &amp; phrases</div>
           <h3 id="playDetailTitle"></h3>
           <div class="play-detail-meta" id="playDetailMeta"></div>
         </div>
@@ -833,11 +834,9 @@
 
     modal.titleEl.textContent = play.title || play.abbr || 'Unknown book';
     const fmt = (n) => (typeof window.formatCellNumber === 'function' ? window.formatCellNumber(n) : n);
-    modal.metaEl.textContent = `${play.genre || 'Unknown section'} \u00b7 ${fmt(totalWords)} words \u00b7 ${fmt(totalVerses)} verses \u00b7 ${fmt(chapters)} chapters`;
-    if (typeof window.applyDirectionalText === 'function') {
-      window.applyDirectionalText(modal.titleEl, { mixed: true });
-      window.applyDirectionalText(modal.metaEl);
-    }
+    // Keep the header LTR and bidi-isolate the Hebrew section name so it
+    // cannot pull the adjacent number into its RTL run.
+    modal.metaEl.innerHTML = `<bdi>${escapeHTML(play.genre || 'Unknown section')}</bdi> \u00b7 ${fmt(totalWords)} words \u00b7 ${fmt(totalVerses)} verses \u00b7 ${fmt(chapters)} chapters`;
     if (modal.filterNamesToggle) modal.filterNamesToggle.checked = true;
     if (modal.pageSizeEl) modal.pageSizeEl.value = String(playDetailState.pageSize);
     modal.overlay.classList.add('open');

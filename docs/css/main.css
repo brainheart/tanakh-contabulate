@@ -870,6 +870,14 @@ td.add-column-cell {
 .commentary-detail-pagination label {
   font-weight: 400;
 }
+.play-detail-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a6b5b;
+  margin-bottom: 0.15rem;
+}
 .play-detail-overlay {
   position: fixed;
   inset: 0;

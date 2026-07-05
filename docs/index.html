@@ -588,10 +588,37 @@
     }
     return m;
   }
+  // The address bar mirrors the app state: refinements (sorts, filters,
+  // toggles) replace the current history entry, while navigation-like
+  // changes (granularity switches/drills, opening the commentary modal)
+  // push one, so the browser Back button walks the drill-down trail.
+  // Armed only after startup: early drawer refreshes must not write the URL,
+  // or applyStateFromURL would read back its own echo as a deep link.
+  let historySyncEnabled = false;
+  let historyReplaceOnlyUntil = 0;
+  function syncHistoryUrl(search) {
+    if (!historySyncEnabled) return;
+    if (typeof history === 'undefined' || typeof history.replaceState !== 'function') return;
+    if (search === location.search) return;
+    let mode = 'replaceState';
+    if (Date.now() > historyReplaceOnlyUntil) {
+      const oldSp = new URLSearchParams(location.search);
+      const newSp = new URLSearchParams(search);
+      // A pristine URL means the default view (books), so a first action that
+      // keeps that granularity replaces rather than pushes.
+      const oldGran = oldSp.has('gran') ? oldSp.get('gran') : granularityToURL('play');
+      const granChanged = oldGran !== newSp.get('gran');
+      const modalOpened = !oldSp.get('cm') && !!newSp.get('cm');
+      if (granChanged || modalOpened) mode = 'pushState';
+    }
+    try { history[mode](null, '', location.pathname + search); } catch (_) { /* ignore */ }
+  }
   function updateDeepLink() {
     const p = buildQueryParamsFromState();
-    const url = location.origin + location.pathname + '?' + p.toString();
+    const search = '?' + p.toString();
+    const url = location.origin + location.pathname + search;
     document.querySelectorAll('.deep-link').forEach(a => { a.href = url; a.textContent = url; });
+    syncHistoryUrl(search);
   }
   function updateSegmentsFilterActions() {
     const container = document.getElementById('segmentsFilterActions');
@@ -980,72 +1007,91 @@
   }
 
   // Apply state from deep link if present
+  // Total application of URL params to app state: absent conditional params
+  // reset to their defaults, so history navigation (Back/Forward) restores
+  // any previously visited state exactly.
+  function applyUrlState(sp) {
+    try {
+      // Display
+      if (sp.has('cs')) colorScaleState.colorScaleEnabled = sp.get('cs') === '1';
+      // ignore palette and steps from URL to keep behavior consistent and URLs clean
+      if (sp.has('hl')) colorScaleState.highlightEnabled = sp.get('hl') === '1';
+      syncColorScaleToggles(); syncColorScaleOptions(); syncHighlightToggles();
+      // Segments
+      if (sp.has('q')) q.value = sp.get('q');
+      else if (sp.has('ts')) q.value = '';
+      if (sp.has('nm')) ngramMode.value = sp.get('nm');
+      if (sp.has('gran')) gran.value = normalizeGranularity(sp.get('gran'));
+      if (sp.has('mm')) matchMode.value = sp.get('mm');
+      if (sp.has('zr')) {
+        showZeroRows = sp.get('zr') === '1';
+        if (showZeroRowsToggle) showZeroRowsToggle.checked = showZeroRows;
+      }
+      const metricCodes = sp.has('mc') ? sp.get('mc').split(',').map(s2 => s2.trim()) : [];
+      enabledMetricCodes = METRIC_COL_DEFS.map(d => d.code).filter(c => metricCodes.includes(c));
+      syncMetricToggles();
+      setSelectedCommentatorKeys(sp.has('commentators') ? decodeCommentatorsParam(sp.get('commentators')) : []);
+      if (sp.has('ts')) {
+        setActiveTermsFromRestoredState(null, decodeTermSpecsParam(sp.get('ts')), true);
+      } else {
+        const restoredExtras = sp.has('qt') ? decodeExtrasParam(sp.get('qt')) : [];
+        setActiveTermsFromRestoredState(sp.has('q') ? q.value : '', restoredExtras, true);
+      }
+      sortKey = sp.has('sk') ? normalizeSegmentsColumnKey(sp.get('sk')) : null;
+      sortDir = sp.has('sd') ? sp.get('sd') : 'desc';
+      segmentsColumnOrder = sp.has('co')
+        ? sp.get('co').split(',').map(s => normalizeSegmentsColumnKey(s.trim())).filter(Boolean)
+        : [];
+      // Clear filters only for current granularity
+      getSegmentsFiltersMap().clear();
+      for (const [k, v] of sp.entries()) {
+        if (k.startsWith('s_fn_')) {
+          const key = normalizeSegmentsColumnKey(k.slice(5));
+          const [min, max] = (v || '').split('~');
+          getSegmentsFiltersMap().set(key, { type:'number', min, max });
+        } else if (k.startsWith('s_ft_')) {
+          const key = normalizeSegmentsColumnKey(k.slice(5));
+          getSegmentsFiltersMap().set(key, { type:'text', pattern: v || '' });
+        }
+      }
+    } catch(e) { /* apply what we can, still render */ }
+    updateSegmentsMatchModeUI();
+    doSearch();
+    applyColorScalesForVisibleTables();
+    // The commentary modal follows the cm param (no-op before its init)
+    const cmParam = sp.get('cm');
+    if (cmParam && typeof window.openCommentaryDetailFromParam === 'function') {
+      window.openCommentaryDetailFromParam(cmParam);
+    } else if (!cmParam
+      && typeof window.getCommentaryDetailParam === 'function' && window.getCommentaryDetailParam()
+      && typeof window.closeCommentaryDetail === 'function') {
+      window.closeCommentaryDetail();
+    }
+    updateDeepLink();
+  }
+
+  window.addEventListener('popstate', () => {
+    // Re-applying popped state must not create new history entries
+    historyReplaceOnlyUntil = Date.now() + 1500;
+    const sp = new URLSearchParams(location.search);
+    // The pristine entry (no params) is the default books view
+    if (!sp.has('gran')) sp.set('gran', granularityToURL('play'));
+    applyUrlState(sp);
+  });
+
   (function applyStateFromURL(){
     const sp = new URLSearchParams(location.search);
     // New readable params first
     if (sp.has('tab') || sp.has('q') || sp.has('ts') || sp.has('l_q') || sp.has('gran') || sp.has('co') || sp.has('mc')) {
       appliedDeepLinkState = true;
-      try {
-        // Display
-        if (sp.has('cs')) colorScaleState.colorScaleEnabled = sp.get('cs') === '1';
-        // ignore palette and steps from URL to keep behavior consistent and URLs clean
-        if (sp.has('hl')) colorScaleState.highlightEnabled = sp.get('hl') === '1';
-        syncColorScaleToggles(); syncColorScaleOptions(); syncHighlightToggles();
-        // Tab (ignored; segments only)
-        // Segments
-        if (sp.has('q')) q.value = sp.get('q');
-        else if (sp.has('ts')) q.value = '';
-        if (sp.has('nm')) ngramMode.value = sp.get('nm');
-        if (sp.has('gran')) gran.value = normalizeGranularity(sp.get('gran'));
-        if (sp.has('mm')) matchMode.value = sp.get('mm');
-        if (sp.has('zr')) {
-          showZeroRows = sp.get('zr') === '1';
-          if (showZeroRowsToggle) showZeroRowsToggle.checked = showZeroRows;
-        }
-        if (sp.has('mc')) {
-          const codes = sp.get('mc').split(',').map(s2 => s2.trim());
-          enabledMetricCodes = METRIC_COL_DEFS.map(d => d.code).filter(c => codes.includes(c));
-          syncMetricToggles();
-        }
-        if (sp.has('commentators')) {
-          setSelectedCommentatorKeys(decodeCommentatorsParam(sp.get('commentators')));
-        }
-        if (sp.has('ts')) {
-          setActiveTermsFromRestoredState(null, decodeTermSpecsParam(sp.get('ts')), true);
-        } else {
-          const restoredExtras = sp.has('qt') ? decodeExtrasParam(sp.get('qt')) : [];
-          setActiveTermsFromRestoredState(sp.has('q') ? q.value : '', restoredExtras, true);
-        }
-        if (sp.has('sk')) sortKey = normalizeSegmentsColumnKey(sp.get('sk'));
-        if (sp.has('sd')) sortDir = sp.get('sd');
-        if (sp.has('co')) {
-          segmentsColumnOrder = sp.get('co').split(',').map(s => normalizeSegmentsColumnKey(s.trim())).filter(Boolean);
-        }
-        // Clear filters only for current granularity
-        getSegmentsFiltersMap().clear();
-        for (const [k, v] of sp.entries()) {
-          if (k.startsWith('s_fn_')) {
-            const key = normalizeSegmentsColumnKey(k.slice(5));
-            const [min, max] = (v || '').split('~');
-            getSegmentsFiltersMap().set(key, { type:'number', min, max });
-          } else if (k.startsWith('s_ft_')) {
-            const key = normalizeSegmentsColumnKey(k.slice(5));
-            getSegmentsFiltersMap().set(key, { type:'text', pattern: v || '' });
-          }
-        }
-      } catch(e) { /* continue to finally */ }
-        updateSegmentsMatchModeUI();
-        // Trigger render for segments regardless
-        doSearch();
-        applyColorScalesForVisibleTables();
-        updateDeepLink();
+      applyUrlState(sp);
       return;
     }
     // Legacy base64 fallback
     const enc = sp.get('state');
-    if (!enc) { updateDeepLink(); return; }
+    if (!enc) { return; }
     const st = decodeState(enc);
-    if (!st) { updateDeepLink(); return; }
+    if (!st) { return; }
     try {
       // Display
       if (st.display) {
@@ -2332,6 +2378,8 @@
     gran.value = 'play';
     doSearch();
   }
+  // Startup state is settled; the address bar may now mirror state changes
+  historySyncEnabled = true;
   scheduleAllLinesPreload();
 
   // Color Scale Module — loaded from js/color-scale.js

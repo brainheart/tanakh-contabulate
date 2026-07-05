@@ -101,6 +101,35 @@ test('count cells drill down through the granularities', async ({ page }) => {
   await page.locator('.play-detail-close').click();
 });
 
+test('address bar tracks state and browser Back walks the drill trail', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+  await expect(page.locator('#results tbody tr')).toHaveCount(39);
+
+  // Drill books → chapters → verses
+  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await expect(page.locator('#gran')).toHaveValue('act');
+  await page.waitForFunction(() => location.search.includes('gran=act'));
+  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await expect(page.locator('#gran')).toHaveValue('line');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
+
+  // Back un-drills, step by step
+  await page.goBack();
+  await expect(page.locator('#gran')).toHaveValue('act');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(50 total rows)');
+  await page.goBack();
+  await expect(page.locator('#gran')).toHaveValue('play');
+  await expect(page.locator('#results tbody tr')).toHaveCount(39);
+
+  // Opening the commentary modal pushes history; Back closes it
+  await page.locator('#results tbody .commentary-count-link').first().click();
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeVisible();
+  await page.waitForFunction(() => location.search.includes('cm='));
+  await page.goBack();
+  await expect(page.locator('.commentary-detail-overlay.open')).toBeHidden();
+});
+
 test('book ngram modal lists configured names and supports editing', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);

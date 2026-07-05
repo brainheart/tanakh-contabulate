@@ -860,6 +860,7 @@
   window.isCommentaryDetailCell = isCommentaryDetailCell;
   window.buildCommentaryDetailLink = buildCommentaryDetailLink;
   window.getCommentaryDetailParam = () => currentDetailParam;
+  window.closeCommentaryDetail = closeModal;
   window.openCommentaryDetailFromParam = function (value) {
     const parsed = paramToScope(value);
     if (!parsed) return false;

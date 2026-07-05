@@ -810,7 +810,8 @@
     return result;
   }
 
-  async function openPlayDetailModal(playId) {
+  async function openPlayDetailModal(playId, initialN) {
+    const startN = [1, 2, 3].includes(Number(initialN)) ? Number(initialN) : 1;
     const play = playsById.get(playId);
     if (!play) return;
 
@@ -853,7 +854,7 @@
     playDetailState.maxByNNoNames = data.maxByNNoNames;
     setElementHidden(modal.loading, true);
     setElementHidden(modal.table, false);
-    modal.setTab(1);
+    modal.setTab(startN);
   }
 
   // Event delegation for play detail links (works across all tables)
@@ -864,7 +865,7 @@
     if (!Number.isInteger(playId)) return;
     e.preventDefault();
     e.stopPropagation();
-    openPlayDetailModal(playId);
+    openPlayDetailModal(playId, Number(trigger.dataset.ngramN) || 1);
   });
 
   document.addEventListener('keydown', (e) => {

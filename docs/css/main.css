@@ -712,7 +712,8 @@ td.add-column-cell {
 .play-detail-link:hover {
   color: #6d1028;
 }
-.commentary-count-link {
+.commentary-count-link,
+.drill-link {
   background: transparent;
   border: none;
   /* Inherit the color-scale cell color so counts stay readable on any swatch */
@@ -726,11 +727,17 @@ td.add-column-cell {
   text-decoration-thickness: 1px;
   text-underline-offset: 0.16em;
 }
-.commentary-count-link:hover {
+.commentary-count-link:hover,
+.drill-link:hover {
   background: transparent;
   box-shadow: none;
   color: inherit;
   text-decoration-thickness: 2px;
+}
+/* # words opens the words & phrases modal but keeps the count-link look */
+.play-detail-link.drill-link,
+.play-detail-link.drill-link:hover {
+  color: inherit;
 }
 .commentary-detail-overlay {
   position: fixed;

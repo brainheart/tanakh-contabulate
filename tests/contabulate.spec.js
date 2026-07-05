@@ -72,6 +72,35 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await expect(page.locator('#results tbody')).toContainText('אֱלֹהִ');
 });
 
+test('count cells drill down through the granularities', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+
+  // Books → the 50 chapters of Genesis
+  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await expect(page.locator('#gran')).toHaveValue('act');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(50 total rows)');
+  await expect(page.locator('#segmentsFiltersInfo')).toContainText('1 active filter');
+
+  // Chapters → the 31 verses of Genesis 1
+  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await expect(page.locator('#gran')).toHaveValue('line');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
+
+  // Sections gain a # chapters column and drill to the Book view
+  await page.selectOption('#gran', 'genre');
+  await expect(page.locator('#results thead th[data-key="num_chapters"]')).toHaveCount(1);
+  await page.locator('#results tbody tr', { hasText: 'תורה' }).first().locator('button.drill-link').first().click();
+  await expect(page.locator('#gran')).toHaveValue('play');
+  await expect(page.locator('#results tbody tr')).toHaveCount(5);
+
+  // The words/bigrams/trigrams count opens the words & phrases modal
+  await page.locator('#results tbody tr').first().locator('.play-detail-link.drill-link').click();
+  await expect(page.locator('.play-detail-overlay.open')).toBeVisible();
+  await expect(page.locator('.play-detail-kicker')).toContainText('Words & phrases');
+  await page.locator('.play-detail-close').click();
+});
+
 test('book ngram modal lists configured names and supports editing', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);

@@ -468,6 +468,15 @@
     if (!segmentsFiltersByGran.has(g)) segmentsFiltersByGran.set(g, new Map());
     return segmentsFiltersByGran.get(g);
   }
+  // Drill-down constants (declared early: deep links render before the
+  // drill helpers further down are reached in source order)
+  const TERM_COUNT_KEY_RE = /^t\d+_count$/;
+  const DRILL_TARGETS = {
+    genre: { num_plays: 'play', num_chapters: 'act', verse_count: 'line' },
+    play: { num_chapters: 'act', verse_count: 'line' },
+    act: { verse_count: 'line' }
+  };
+  const DRILL_NOUNS = { play: 'books', act: 'chapters', line: 'verses' };
   // Segments pagination and rows (declare early for deep-link)
   let segmentsCurrentPage = 1;
   let segmentsPageSize = 50;
@@ -1479,11 +1488,13 @@
 
     const genreTotals = new Map();
     const genrePlayCounts = new Map();
+    const genreChapterCounts = new Map();
     if (granVal === 'genre') {
       plays.forEach(play => {
         const g = play.genre || 'unknown';
         genreTotals.set(g, (genreTotals.get(g) || 0) + (play.total_words || 0));
         genrePlayCounts.set(g, (genrePlayCounts.get(g) || 0) + 1);
+        genreChapterCounts.set(g, (genreChapterCounts.get(g) || 0) + (play.num_acts || 0));
       });
     }
     if ((showZeroRows || !hasTerms) && granVal !== 'line') {
@@ -1521,7 +1532,7 @@
         for (const [genre, totalWords] of genreTotals.entries()) {
           ensureRow(genre, () => {
             const ngramCount = getRowNgramCount(totalWords);
-            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
+            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, num_chapters: genreChapterCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
           });
         }
       } else if (granVal === 'character') {
@@ -1753,6 +1764,7 @@
       const baseCols = [
         {key:'genre', label:'Section', defaultDir:'asc', type:'text'},
         {key:'num_plays', label:'# books', type:'number'},
+        {key:'num_chapters', label:'# chapters', type:'number'},
         {key:'verse_count', label:'# verses', type:'number'},
         ...getVerseNormalizedCommentaryColumns(),
         {key:'ngram_count', label: getBaseCountLabel(), type:'number'}
@@ -1770,7 +1782,7 @@
           const totalWords = genreTotals.get(genre) || 0;
           const row = ensureRow(genre, () => {
             const ngramCount = getRowNgramCount(totalWords);
-            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
+            return addCommentaryFields({ genre, num_plays: genrePlayCounts.get(genre) || 0, num_chapters: genreChapterCounts.get(genre) || 0, verse_count: genreVerseCounts.get(genre) || 0, total_words: totalWords, ngram_count:ngramCount }, genreCommentaryTotals.get(genre));
           });
           const denom = denomFor(normalizeTermN(term.n) || 1, 'genre', { total_words: totalWords });
           row[`${termKeys[termIdx]}_count`] = count;
@@ -1905,7 +1917,73 @@
       }
     });
   }
-  
+
+  // --- Drill-down links: every count is a door into the things it counts ---
+  function sectionLocationPrefix(genre) {
+    const play = plays.find(p => (p.genre || 'unknown') === genre);
+    const sectionId = play && String(play.location || '').split('.')[0];
+    return sectionId ? `${sectionId}.` : '';
+  }
+
+  function drillLocationPrefix(granVal, row) {
+    if (granVal === 'genre') return sectionLocationPrefix(row.genre);
+    return row.location ? `${row.location}.` : '';
+  }
+
+  function drillRowLabel(granVal, row) {
+    if (granVal === 'act') return `${row.play_title || ''} ${row.act ?? ''}`.trim();
+    return row.title || row.play_title || row.genre || '';
+  }
+
+  function getDrillSpec(granVal, key, row) {
+    if (!row) return null;
+    const prefix = drillLocationPrefix(granVal, row);
+    if (!prefix) return null;
+    const label = drillRowLabel(granVal, row);
+    if (TERM_COUNT_KEY_RE.test(key) && DRILL_TARGETS[granVal]) {
+      const count = Number(row[key]);
+      if (!Number.isFinite(count) || count <= 0) return null;
+      return { target: 'line', prefix, termKey: key, count, title: `Show the matching verses in ${label}` };
+    }
+    const target = DRILL_TARGETS[granVal] && DRILL_TARGETS[granVal][key];
+    if (!target) return null;
+    const count = Number(row[key]);
+    if (!Number.isFinite(count) || count <= 0) return null;
+    return {
+      target,
+      prefix,
+      termKey: '',
+      count,
+      title: `Show the ${formatCellNumber(count)} ${DRILL_NOUNS[target]} of ${label}`
+    };
+  }
+
+  function drillTo(spec) {
+    gran.value = spec.target;
+    const filters = getSegmentsFiltersMap();
+    filters.set('location', { type: 'text', pattern: '^' + escapeRegexText(spec.prefix) });
+    if (spec.termKey) {
+      for (const key of Array.from(filters.keys())) {
+        if (TERM_COUNT_KEY_RE.test(key)) filters.delete(key);
+      }
+      filters.set(spec.termKey, { type: 'number', min: 1 });
+    }
+    doSearch();
+  }
+
+  function buildDrillLink(spec) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'drill-link';
+    btn.textContent = formatCellNumber(spec.count);
+    btn.title = spec.title;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      drillTo(spec);
+    });
+    return btn;
+  }
+
   function renderSegmentsPage() {
     const totalPages = getTotalPages(segmentsAllRows.length, segmentsPageSize);
     const paginatedRows = paginateArray(segmentsAllRows, segmentsCurrentPage, segmentsPageSize);
@@ -1948,6 +2026,21 @@
           } else {
             td.textContent = (v === undefined || v === null) ? '' : v;
           }
+        } else if (getDrillSpec(granVal, k, r)) {
+          const spec = getDrillSpec(granVal, k, r);
+          td.appendChild(buildDrillLink(spec));
+          td.dataset.value = String(spec.count);
+        } else if (granVal === 'play' && k === 'ngram_count' && Number(r[k]) > 0 && r.play_id != null) {
+          // Count of words/bigrams/trigrams → the words & phrases modal,
+          // opened on the tab matching the current n-gram mode
+          const link = document.createElement('span');
+          link.className = 'play-detail-link drill-link';
+          link.dataset.playId = String(r.play_id);
+          link.dataset.ngramN = String(getSelectedNgramModeValue());
+          link.textContent = formatCellNumber(r[k]);
+          link.title = 'Words & phrases of this book';
+          td.appendChild(link);
+          td.dataset.value = String(r[k]);
         } else if (typeof isCharacterDetailCell === 'function' && isCharacterDetailCell(granVal, k, r)) {
           const v = r[k];
           if (v !== undefined && v !== null && r.character_id != null) {

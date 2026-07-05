@@ -64,3 +64,4 @@ npx playwright test
 - Display text preserves pointed Hebrew and sof pasuq punctuation.
 - Commentary counts store per-verse counts, commentator metadata, and compact per-book comment references. The app fetches visible comment text from Sefaria when a commentary count is opened.
 - The overall UI remains LTR, while Hebrew content cells and verse text render RTL.
+- Counts are drill-down links: a count of chapters/verses/books opens that granularity filtered to the row's scope (via a location-prefix column filter), term-hit counts open the matching verses, word counts open the book's words & phrases modal, and comment counts open the commentary list.

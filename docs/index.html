@@ -2399,6 +2399,15 @@
     <span aria-hidden="true"> · </span>
     <a href="https://github.com/brainheart/tanakh-contabulate" target="_blank" rel="noopener">Source</a>
     <span aria-hidden="true"> · </span>
-    <a href="https://github.com/brainheart/tanakh-contabulate/commit/d501404" target="_blank" rel="noopener" title="Current deployed build">build d501404</a></footer>
+    <a id="siteUpdated" href="https://github.com/brainheart/tanakh-contabulate/commits/main" target="_blank" rel="noopener" title="Latest changes">Updated</a></footer>
+<script>
+(function () {
+  var el = document.getElementById('siteUpdated');
+  var d = new Date(document.lastModified);
+  if (el && !isNaN(d)) {
+    el.textContent = 'Updated ' + d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+})();
+</script>
 </body>
 </html>

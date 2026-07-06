@@ -2287,12 +2287,15 @@
         }
         if (tf <= 0) continue;
         const df = bookSet.size || 1;
+        // Sublinear term frequency: with only 39 documents, idf spans just
+        // 0–3.66, so a raw count would swamp rarity (a near-ubiquitous word
+        // missing from one book outscored genuinely concentrated words).
         raw.push({
           ngram,
           count: tf,
           verse_count: verses,
           book_count: df,
-          tfidf: Math.round(tf * Math.log(totalBooks / df) * 10000) / 10000
+          tfidf: Math.round((1 + Math.log(tf)) * Math.log(totalBooks / df) * 10000) / 10000
         });
       }
       rows = raw;
@@ -2329,7 +2332,7 @@
       { key: 'verse_count', label: '# verses', type: 'number', defaultDir: 'desc' },
       {
         key: 'unusualness', label: 'Unusualness', type: 'number', defaultDir: 'desc',
-        tooltip: 'Percentile of TF-IDF (count within the current scope × ln(39 / books containing the term)) among this view’s vocabulary: 99 means more distinctive here than 99% of terms. Ubiquitous terms land near 0.'
+        tooltip: 'Percentile of TF-IDF ((1 + ln count within the current scope) × ln(39 / books containing the term)) among this view’s vocabulary: 99 means more distinctive here than 99% of terms. Ubiquitous terms land near 0.'
       }
     ];
     setHeaders(cols);

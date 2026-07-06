@@ -77,13 +77,13 @@ test('count cells drill down through the granularities', async ({ page }) => {
   await page.waitForFunction(() => window.__contabulateReady === true);
 
   // Books → the 50 chapters of Genesis
-  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('act');
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(50 total rows)');
   await expect(page.locator('#segmentsFiltersInfo')).toContainText('1 active filter');
 
   // Chapters → the 31 verses of Genesis 1
-  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('line');
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
 
@@ -101,16 +101,43 @@ test('count cells drill down through the granularities', async ({ page }) => {
   await page.locator('.play-detail-close').click();
 });
 
+test('ancestor name cells filter the current view to their scope', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+
+  // Book titles are no longer modal links
+  await expect(page.locator('#results tbody tr').first().locator('td:nth-child(2) .play-detail-link')).toHaveCount(0);
+
+  // Section cell in the books view filters books to that section
+  await page.locator('#results tbody tr').first().locator('td:nth-child(3) .drill-link').click();
+  await expect(page.locator('#gran')).toHaveValue('play');
+  await expect(page.locator('#results tbody tr')).toHaveCount(5);
+  await expect(page.locator('#segmentsFiltersInfo')).toContainText('1 active filter');
+
+  // Book cell in the full chapters view filters to that book's chapters
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+  await page.selectOption('#gran', 'act');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(929 total rows)');
+  await page.locator('#results tbody tr').first().locator('td:nth-child(2) .drill-link').click();
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(50 total rows)');
+
+  // Chapter cell in the verses view filters to that chapter's verses
+  await page.selectOption('#gran', 'line');
+  await page.locator('#results tbody tr').first().locator('td:nth-child(3) .drill-link').click();
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
+});
+
 test('address bar tracks state and browser Back walks the drill trail', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);
   await expect(page.locator('#results tbody tr')).toHaveCount(39);
 
   // Drill books → chapters → verses
-  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('act');
   await page.waitForFunction(() => location.search.includes('gran=act'));
-  await page.locator('#results tbody tr').first().locator('button.drill-link').first().click();
+  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('line');
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
 
@@ -133,7 +160,7 @@ test('address bar tracks state and browser Back walks the drill trail', async ({
 test('book ngram modal lists configured names and supports editing', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);
-  await page.locator('#results .play-detail-link', { hasText: 'Ruth' }).click();
+  await page.locator('#results tbody tr', { hasText: 'Ruth' }).locator('.play-detail-link.drill-link').click();
   await page.waitForSelector('#playDetailTable:not(.is-hidden)', { timeout: 30000 });
 
   await expect(page.locator('.excluded-terms-details summary')).toContainText('Filtering 50 terms');

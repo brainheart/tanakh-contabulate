@@ -609,7 +609,10 @@
       const oldGran = oldSp.has('gran') ? oldSp.get('gran') : granularityToURL('play');
       const granChanged = oldGran !== newSp.get('gran');
       const modalOpened = !oldSp.get('cm') && !!newSp.get('cm');
-      if (granChanged || modalOpened) mode = 'pushState';
+      // Scope changes at the same granularity (ancestor-cell filters) are
+      // navigations too — Back should undo them.
+      const scopeChanged = oldSp.get('s_ft_location') !== newSp.get('s_ft_location');
+      if (granChanged || modalOpened || scopeChanged) mode = 'pushState';
     }
     try { history[mode](null, '', location.pathname + search); } catch (_) { /* ignore */ }
   }
@@ -2004,6 +2007,44 @@
     };
   }
 
+  // Ancestor-name cells filter the current granularity to that ancestor:
+  // Section in the books view, Book in the chapters/verses views, Chapter in
+  // the verses view. Identity cells stay plain.
+  function getAncestorDrillSpec(granVal, key, row) {
+    if (!row) return null;
+    if (granVal === 'play' && key === 'genre' && row.genre) {
+      const prefix = sectionLocationPrefix(row.genre);
+      if (!prefix) return null;
+      return { target: 'play', prefix, termKey: '', text: String(row.genre), title: `Show the books of ${row.genre}` };
+    }
+    const locParts = String(row.location || '').split('.');
+    if ((granVal === 'act' || granVal === 'line') && key === 'play_title' && row.play_title && locParts.length >= 4) {
+      const prefix = locParts.slice(0, 3).join('.') + '.';
+      return {
+        target: granVal,
+        prefix,
+        termKey: '',
+        text: String(row.play_title),
+        title: `Show the ${DRILL_NOUNS[granVal]} of ${row.play_title}`
+      };
+    }
+    if (granVal === 'line' && key === 'act' && row.act != null && locParts.length >= 5) {
+      const prefix = locParts.slice(0, 4).join('.') + '.';
+      return {
+        target: 'line',
+        prefix,
+        termKey: '',
+        text: String(row.act),
+        title: `Show the verses of ${row.play_title || ''} ${row.act}`.trim()
+      };
+    }
+    return null;
+  }
+
+  function getAnyDrillSpec(granVal, key, row) {
+    return getDrillSpec(granVal, key, row) || getAncestorDrillSpec(granVal, key, row);
+  }
+
   function drillTo(spec) {
     gran.value = spec.target;
     const filters = getSegmentsFiltersMap();
@@ -2021,7 +2062,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'drill-link';
-    btn.textContent = formatCellNumber(spec.count);
+    btn.textContent = spec.text != null ? spec.text : formatCellNumber(spec.count);
     btn.title = spec.title;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2072,10 +2113,10 @@
           } else {
             td.textContent = (v === undefined || v === null) ? '' : v;
           }
-        } else if (getDrillSpec(granVal, k, r)) {
-          const spec = getDrillSpec(granVal, k, r);
+        } else if (getAnyDrillSpec(granVal, k, r)) {
+          const spec = getAnyDrillSpec(granVal, k, r);
           td.appendChild(buildDrillLink(spec));
-          td.dataset.value = String(spec.count);
+          if (spec.count != null) td.dataset.value = String(spec.count);
         } else if (granVal === 'play' && k === 'ngram_count' && Number(r[k]) > 0 && r.play_id != null) {
           // Count of words/bigrams/trigrams → the words & phrases modal,
           // opened on the tab matching the current n-gram mode
@@ -2094,14 +2135,6 @@
           } else {
             td.textContent = (v === undefined || v === null) ? '' : v;
           }
-        } else if (typeof isPlayDetailCell === 'function' && isPlayDetailCell(granVal, k, r)) {
-          const v = r[k];
-          if (v !== undefined && v !== null && r.play_id != null) {
-            td.appendChild(buildPlayDetailLink(v, r.play_id));
-          } else {
-            td.textContent = (v === undefined || v === null) ? '' : v;
-          }
-          td.classList.add('book-cell');
         } else {
           const v = r[k];
           if (colTypeByKey.get(k) === 'number' && v !== undefined && v !== null && Number.isFinite(Number(v))) {

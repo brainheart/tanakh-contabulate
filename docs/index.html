@@ -492,6 +492,8 @@
     act: { verse_count: 'line' }
   };
   const DRILL_NOUNS = { play: 'books', act: 'chapters', line: 'verses', word: 'words', bigram: 'bigrams', trigram: 'trigrams' };
+  // Declared early: deep links can render vocabulary views during startup
+  const vocabRowsCache = new Map();
   // Segments pagination and rows (declare early for deep-link)
   let segmentsCurrentPage = 1;
   let segmentsPageSize = 50;
@@ -2193,8 +2195,6 @@
   }
 
   // --- Vocabulary granularities: rows are distinct n-grams -----------------
-  const vocabRowsCache = new Map();
-
   function vocabIndexForN(n) {
     return n === 2 ? tokens2 : n === 3 ? tokens3 : tokens;
   }
@@ -2249,6 +2249,17 @@
         const playIds = scopeRe ? Array.from(scopePlayIds) : plays.map(p => p.play_id);
         rows = raw.filter(r => !playIds.some(pid => window.ngramContainsConfiguredName(r.ngram, pid)));
       }
+      // Express unusualness as a midrank percentile of TF-IDF within this
+      // view's vocabulary — stable across scopes, honest about ties.
+      const sortedScores = rows.map(r => r.tfidf).sort((a, b) => a - b);
+      const percentileByScore = new Map();
+      for (let i = 0; i < sortedScores.length;) {
+        let j = i;
+        while (j + 1 < sortedScores.length && sortedScores[j + 1] === sortedScores[i]) j++;
+        percentileByScore.set(sortedScores[i], Math.round(((i + j + 1) / 2 / sortedScores.length) * 1000) / 10);
+        i = j + 1;
+      }
+      for (const row of rows) row.unusualness = percentileByScore.get(row.tfidf) || 0;
       vocabRowsCache.set(cacheKey, rows);
       if (vocabRowsCache.size > 12) vocabRowsCache.delete(vocabRowsCache.keys().next().value);
     }
@@ -2258,8 +2269,8 @@
       { key: 'book_count', label: '# books', type: 'number', defaultDir: 'desc' },
       { key: 'verse_count', label: '# verses', type: 'number', defaultDir: 'desc' },
       {
-        key: 'tfidf', label: 'Unusualness', type: 'number', defaultDir: 'desc',
-        tooltip: 'Count within the current scope × ln(39 / books containing the term). Scoped, it surfaces terms distinctive of the scope; unscoped, terms concentrated in few books. Ubiquitous terms score 0.'
+        key: 'unusualness', label: 'Unusualness', type: 'number', defaultDir: 'desc',
+        tooltip: 'Percentile of TF-IDF (count within the current scope × ln(39 / books containing the term)) among this view’s vocabulary: 99 means more distinctive here than 99% of terms. Ubiquitous terms land near 0.'
       }
     ];
     setHeaders(cols);
@@ -2630,6 +2641,9 @@
   // Initialize with data dependencies
   if (typeof window.initPlayDetail === 'function') {
     window.initPlayDetail({ chunks, tokens, tokens2, tokens3, playsById, chunkById, characters, characterNameFilterConfig, escapeHTML });
+    // A deep-linked vocabulary view rendered before the name filters existed;
+    // rebuild it now that they do (the version-stamped cache invalidates).
+    if (isVocabGranularity(gran.value) && vocabExcludeNames) doSearch();
   }
   if (typeof window.initCommentaryDetail === 'function') {
     window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML, onStateChange: updateDeepLink });

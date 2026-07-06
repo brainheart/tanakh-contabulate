@@ -141,7 +141,7 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   // Word view: n-gram rows with count/books/verses/unusualness columns
   await page.selectOption('#gran', 'word');
   await expect(page.locator('#results thead th[data-key="ngram"]')).toHaveCount(1);
-  await expect(page.locator('#results thead th[data-key="tfidf"]')).toHaveCount(1);
+  await expect(page.locator('#results thead th[data-key="unusualness"]')).toHaveCount(1);
   await expect(page.locator('#vocabNamesToggle')).toBeVisible();
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
 

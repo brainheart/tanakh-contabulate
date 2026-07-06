@@ -95,11 +95,10 @@ test('count cells drill down through the granularities', async ({ page }) => {
   await expect(page.locator('#gran')).toHaveValue('play');
   await expect(page.locator('#results tbody tr')).toHaveCount(5);
 
-  // The words/bigrams/trigrams count opens the words & phrases modal
-  await page.locator('#results tbody tr').first().locator('.play-detail-link.drill-link').click();
-  await expect(page.locator('.play-detail-overlay.open')).toBeVisible();
-  await expect(page.locator('.play-detail-kicker')).toContainText('Words & phrases');
-  await page.locator('.play-detail-close').click();
+  // The words/bigrams/trigrams count drills into the book's vocabulary
+  await page.locator('#results tbody tr').first().locator('button.drill-link[title*="words of"]').click();
+  await expect(page.locator('#gran')).toHaveValue('word');
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.Gen.');
 });
 
 test('ancestor name cells filter the current view to their scope', async ({ page }) => {
@@ -143,13 +142,13 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   await expect(page.locator('#results thead th[data-key="ngram"]')).toHaveCount(1);
   await expect(page.locator('#results thead th[data-key="unusualness"]')).toHaveCount(1);
   await expect(page.locator('#vocabNamesToggle')).toBeVisible();
-  await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
 
-  // Toggling the configured-names exclusion reveals the name forms
-  await page.setChecked('#vocabNamesCheckbox', false);
+  // Names are visible by default; hiding them shrinks the vocabulary
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(39617 total rows)');
   await page.setChecked('#vocabNamesCheckbox', true);
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
+  await page.setChecked('#vocabNamesCheckbox', false);
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39617 total rows)');
 
   // A chapter's word count drills into its scoped vocabulary
   await page.selectOption('#gran', 'act');
@@ -192,28 +191,32 @@ test('address bar tracks state and browser Back walks the drill trail', async ({
   await expect(page.locator('.commentary-detail-overlay.open')).toBeHidden();
 });
 
-test('book ngram modal lists configured names and supports editing', async ({ page }) => {
+test('the proper-name list is editable in a book-scoped vocabulary view', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);
-  await page.locator('#results tbody tr', { hasText: 'Ruth' }).locator('.play-detail-link.drill-link').click();
-  await page.waitForSelector('#playDetailTable:not(.is-hidden)', { timeout: 30000 });
+  // A book's word count drills into its scoped vocabulary, where the
+  // proper-name list is editable
+  await page.locator('#results tbody tr', { hasText: 'Ruth' }).locator('button.drill-link[title*="words of"]').click();
+  await expect(page.locator('#gran')).toHaveValue('word');
+  await expect(page.locator('#nameFilterEditor summary')).toContainText('50 proper-name terms');
+  await page.locator('#nameFilterEditor summary').click();
+  await expect(page.locator('#nameFilterEditor .excluded-term-chip', { hasText: 'בעז' }).first()).toBeVisible();
 
-  await expect(page.locator('.excluded-terms-details summary')).toContainText('Filtering 50 terms');
-  await page.locator('.excluded-terms-details summary').click();
-  await expect(page.locator('.excluded-term-chip', { hasText: 'בעז' }).first()).toBeVisible();
-
-  // Exclude the top n-gram from the row button; it disappears and persists
-  const firstNgram = (await page.locator('#playDetailTableBody tr td:nth-child(2) span').first().textContent()).trim();
-  await page.locator('#playDetailTableBody .ngram-exclude-btn').first().click();
-  const topAfter = await page.locator('#playDetailTableBody tr td:nth-child(2) span').allTextContents();
-  expect(topAfter.map(t => t.trim())).not.toContain(firstNgram);
+  // Hide the top word from its row button; it joins the list and persists
+  const firstNgram = (await page.locator('#results tbody tr').first().locator('td:nth-child(1) span').textContent()).trim();
+  await page.locator('#results tbody tr').first().locator('.ngram-exclude-btn').click();
+  await expect(page.locator('#nameFilterEditor summary')).toContainText('51 proper-name terms');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('tanakhNameFilterOverrides')));
   expect(stored.Ruth.added).toContain(firstNgram);
 
+  // Turning on "Hide proper names" removes it from the rows
+  await page.setChecked('#vocabNamesCheckbox', true);
+  const shown = await page.locator('#results tbody tr td:nth-child(1) span').allTextContents();
+  expect(shown.map(t => t.trim())).not.toContain(firstNgram);
+
   // Reset restores the built-in list
-  await page.locator('.excluded-terms-reset').click();
-  await expect(page.locator('.excluded-terms-details summary')).toContainText('Filtering 50 terms');
-  await page.locator('.play-detail-close').click();
+  await page.locator('#nameFilterEditor .excluded-terms-reset').click();
+  await expect(page.locator('#nameFilterEditor summary')).toContainText('50 proper-name terms');
 });
 
 test('opens the commentary modal from a cm deep link', async ({ page }) => {

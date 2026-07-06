@@ -402,6 +402,11 @@ td.ranked-cell {
 .link-btn-no-padding {
   padding: 0;
 }
+.vocab-names-toggle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
 .muted { 
   color: #665544;
   font-size: 0.95rem;

@@ -134,6 +134,35 @@ test('ancestor name cells filter the current view to their scope', async ({ page
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(31 total rows)', { timeout: 15000 });
 });
 
+test('vocabulary granularities put n-grams in the rows with doors both ways', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+
+  // Word view: n-gram rows with count/books/verses/unusualness columns
+  await page.selectOption('#gran', 'word');
+  await expect(page.locator('#results thead th[data-key="ngram"]')).toHaveCount(1);
+  await expect(page.locator('#results thead th[data-key="tfidf"]')).toHaveCount(1);
+  await expect(page.locator('#vocabNamesToggle')).toBeVisible();
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
+
+  // Toggling the configured-names exclusion reveals the name forms
+  await page.setChecked('#vocabNamesCheckbox', false);
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39617 total rows)');
+  await page.setChecked('#vocabNamesCheckbox', true);
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
+
+  // A chapter's word count drills into its scoped vocabulary
+  await page.selectOption('#gran', 'act');
+  await page.locator('#results tbody tr').first().locator('button.drill-link[title*="words of"]').click();
+  await expect(page.locator('#gran')).toHaveValue('word');
+  await expect(page.locator('#segmentsActiveFilters')).toContainText('starts with 01.01.Gen.001.');
+
+  // An n-gram's verse count doors back into the matching verses
+  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
+  await expect(page.locator('#gran')).toHaveValue('line');
+  await expect(page.locator('#results tbody .hit').first()).toBeVisible({ timeout: 15000 });
+});
+
 test('address bar tracks state and browser Back walks the drill trail', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__contabulateReady === true);

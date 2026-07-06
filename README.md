@@ -66,3 +66,4 @@ npx playwright test
 - The overall UI remains LTR, while Hebrew content cells and verse text render RTL.
 - Counts are drill-down links: a count of chapters/verses/books opens that granularity filtered to the row's scope (via a location-prefix column filter), term-hit counts open the matching verses, the book-level word count opens the book's words & phrases modal, and comment counts open the commentary list.
 - Ancestor name cells filter the current view to that ancestor: Section in the books view, Book in the chapters/verses views, Chapter in the verses view. Identity cells stay plain.
+- Word/Bigram/Trigram granularities put distinct n-grams in the rows (count within the current location scope, corpus-wide book count, verse count, and TF-IDF "unusualness" = scope count × ln(39 / books containing)). Their count cells door back into the location dimension by adding the n-gram as a term column; the configured-names exclusion applies across the books in scope.

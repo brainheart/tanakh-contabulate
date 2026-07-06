@@ -22,7 +22,7 @@
     </div>
   </div>
   <h1><a href="https://contabulate.org/">Contabulate</a>: 🕎 <span class="hebrew-inline" dir="rtl">תנ״ך</span> — Hebrew Bible Tabular Explorer</h1>
-  <p class="muted">A sortable, filterable table of the Tanakh — by section, book, chapter, or verse. Add three kinds of columns: Hebrew search terms (1–3 words); commentator attention from centuries of commentary (click any count to read the comments); and text metrics like sentence length and lexical rarity. The last two live under the <strong>+</strong> at the right edge of the table. Source text courtesy of <a href="https://github.com/openscriptures/morphhb" target="_blank" rel="noopener">Open Scriptures morphhb</a> and the Westminster Leningrad Codex; commentary data from <a href="https://github.com/Sefaria/Sefaria-Export" target="_blank" rel="noopener">Sefaria-Export</a>.</p>
+  <p class="muted">A sortable, filterable table of the Tanakh — by section, book, chapter, or verse, or flipped to its vocabulary: word, bigram, and trigram rows. Add three kinds of columns: Hebrew search terms (1–3 words); commentator attention from centuries of commentary (click any count to read the comments); and text metrics like sentence length and lexical rarity. The last two live under the <strong>+</strong> at the right edge of the table. Source text courtesy of <a href="https://github.com/openscriptures/morphhb" target="_blank" rel="noopener">Open Scriptures morphhb</a> and the Westminster Leningrad Codex; commentary data from <a href="https://github.com/Sefaria/Sefaria-Export" target="_blank" rel="noopener">Sefaria-Export</a>.</p>
 
   <div class="tab-content" id="segmentsTab">
     <div class="controls">
@@ -34,6 +34,9 @@
             <option value="play">Book</option>
             <option value="act">Chapter</option>
             <option value="line" selected>Verse</option>
+            <option value="word">Word</option>
+            <option value="bigram">Bigram</option>
+            <option value="trigram">Trigram</option>
           </select>
         </div>
         <span class="control-divider" aria-hidden="true"></span>
@@ -95,6 +98,9 @@
         <span id="segmentsActiveFilters" class="active-filter-chips"></span>
         <button id="clearSegmentsFilters" class="link-btn link-btn-no-padding">Clear all</button>
       </div>
+      <label id="vocabNamesToggle" class="vocab-names-toggle is-hidden" title="Hide word forms tagged as proper names in the morphhb morphology for the books in scope">
+        <input type="checkbox" id="vocabNamesCheckbox" checked> Exclude configured names
+      </label>
       <div class="color-scale-legend color-scale-legend-inline" title="Each numeric column is shaded from its lowest to highest value"></div>
     </div>
     <table id="results">
@@ -454,12 +460,24 @@
   const segmentsFiltersByGran = new Map(); // gran -> Map(columnKey -> filter)
   function normalizeGranularity(value) {
     if (value === 'verse' || value === 'line' || value === 'scene') return 'line';
-    return ['genre', 'play', 'act', 'character'].includes(value) ? value : 'line';
+    return ['genre', 'play', 'act', 'character', 'word', 'bigram', 'trigram'].includes(value) ? value : 'line';
   }
   function granularityToURL(value) {
     const normalized = normalizeGranularity(value);
     return normalized === 'line' ? 'verse' : normalized;
   }
+  // Vocabulary granularities: rows are n-grams instead of text spans
+  const VOCAB_GRANULARITIES = { word: 1, bigram: 2, trigram: 3 };
+  function isVocabGranularity(value) {
+    return Object.prototype.hasOwnProperty.call(VOCAB_GRANULARITIES, value);
+  }
+  function vocabNFor(value) {
+    return VOCAB_GRANULARITIES[value] || 1;
+  }
+  function vocabGranForN(n) {
+    return n === 2 ? 'bigram' : n === 3 ? 'trigram' : 'word';
+  }
+  let vocabExcludeNames = true;
   function getSegmentsFiltersMap() {
     const g = normalizeGranularity(typeof gran !== 'undefined' && gran ? gran.value : 'line');
     if (!segmentsFiltersByGran.has(g)) segmentsFiltersByGran.set(g, new Map());
@@ -473,7 +491,7 @@
     play: { num_chapters: 'act', verse_count: 'line' },
     act: { verse_count: 'line' }
   };
-  const DRILL_NOUNS = { play: 'books', act: 'chapters', line: 'verses' };
+  const DRILL_NOUNS = { play: 'books', act: 'chapters', line: 'verses', word: 'words', bigram: 'bigrams', trigram: 'trigrams' };
   // Segments pagination and rows (declare early for deep-link)
   let segmentsCurrentPage = 1;
   let segmentsPageSize = 50;
@@ -501,6 +519,7 @@
     p.set('nm', ngramMode.value);
     p.set('gran', granularityToURL(gran.value));
     p.set('mm', matchMode.value);
+    if (isVocabGranularity(gran.value)) p.set('xn', vocabExcludeNames ? '1' : '0');
     const allTermSpecs = [segTermState.primary, ...segTermState.extras].filter(Boolean);
     const extras = segTermState.extras.map(t => (t && t.text ? t.text.trim() : '')).filter(Boolean);
     const termSpecsParam = encodeTermSpecsParam(allTermSpecs);
@@ -1064,6 +1083,11 @@
         showZeroRows = sp.get('zr') === '1';
         if (showZeroRowsToggle) showZeroRowsToggle.checked = showZeroRows;
       }
+      if (sp.has('xn')) {
+        vocabExcludeNames = sp.get('xn') === '1';
+        const xnCheckbox = document.getElementById('vocabNamesCheckbox');
+        if (xnCheckbox) xnCheckbox.checked = vocabExcludeNames;
+      }
       const metricCodes = sp.has('mc') ? sp.get('mc').split(',').map(s2 => s2.trim()) : [];
       enabledMetricCodes = METRIC_COL_DEFS.map(d => d.code).filter(c => metricCodes.includes(c));
       syncMetricToggles();
@@ -1274,22 +1298,26 @@
       });
       theadRow.appendChild(th);
     });
-    const addTh = document.createElement('th');
-    addTh.className = 'add-column-th';
-    addTh.dataset.key = '__add';
-    addTh.title = 'Add columns: commentators and text metrics';
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'add-column-plus';
-    addBtn.textContent = '+';
-    addBtn.setAttribute('aria-label', 'Add columns');
-    addBtn.setAttribute('aria-haspopup', 'dialog');
-    addTh.appendChild(addBtn);
-    addTh.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (typeof window.showAddColumnPopover === 'function') window.showAddColumnPopover(addTh);
-    });
-    theadRow.appendChild(addTh);
+    // Commentator/metric columns are place-measures; they don't apply to
+    // vocabulary rows, so the column adder hides there.
+    if (!isVocabGranularity(gran.value)) {
+      const addTh = document.createElement('th');
+      addTh.className = 'add-column-th';
+      addTh.dataset.key = '__add';
+      addTh.title = 'Add columns: commentators and text metrics';
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'add-column-plus';
+      addBtn.textContent = '+';
+      addBtn.setAttribute('aria-label', 'Add columns');
+      addBtn.setAttribute('aria-haspopup', 'dialog');
+      addTh.appendChild(addBtn);
+      addTh.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof window.showAddColumnPopover === 'function') window.showAddColumnPopover(addTh);
+      });
+      theadRow.appendChild(addTh);
+    }
     updateSortIndicators();
   }
   
@@ -1476,6 +1504,9 @@
 
   function buildRowsForTerms(terms, preferredSortTermIndex = null){
     const granVal = gran.value;
+    if (isVocabGranularity(granVal)) {
+      return buildVocabularyRows(granVal);
+    }
     const activeTerms = (terms || []).map(t => toTermSpec(t, matchMode.value)).filter(Boolean);
     const hasTerms = activeTerms.length > 0;
     const baseN = normalizeTermN(activeTerms[0] && activeTerms[0].n) || getSelectedNgramModeValue();
@@ -1919,6 +1950,9 @@
     const segFilters = getSegmentsFiltersMap();
     for (const [key, f] of segFilters.entries()) {
       if (!f) continue;
+      // At vocabulary granularities the location filter is a scope applied
+      // while building rows (they have no location field of their own)
+      if (key === 'location' && isVocabGranularity(gran.value)) continue;
       const type = f.type || 'text';
       if (type === 'number') {
         const hasMin = f.min != null && f.min !== '';
@@ -1974,6 +2008,9 @@
     renderSegmentsPage();
   }
   function refreshSegmentsFromFilters() {
+    // Vocabulary rows are built under the location scope, so filter edits
+    // there need a rebuild rather than a re-filter of cached rows
+    if (isVocabGranularity(gran.value)) { doSearch(); return; }
     if (!lastSegmentsBaseRows || lastSegmentsBaseRows.length === 0) return;
     let rows = applySegmentsFilters(lastSegmentsBaseRows);
     if (rows.length === 0) {
@@ -2020,6 +2057,17 @@
 
   function getDrillSpec(granVal, key, row) {
     if (!row) return null;
+    if (isVocabGranularity(granVal)) {
+      const count = Number(row[key]);
+      if (!Number.isFinite(count) || count <= 0 || !row.ngram) return null;
+      if (key === 'book_count') {
+        return { vocabNgram: row.ngram, target: 'play', keepScope: false, count, title: `Show the ${formatCellNumber(count)} books containing this ${DRILL_NOUNS[granVal].replace(/s$/, '')}` };
+      }
+      if (key === 'verse_count') {
+        return { vocabNgram: row.ngram, target: 'line', keepScope: true, count, title: `Show the ${formatCellNumber(count)} verses containing this ${DRILL_NOUNS[granVal].replace(/s$/, '')}` };
+      }
+      return null;
+    }
     const prefix = drillLocationPrefix(granVal, row);
     if (!prefix) return null;
     const label = drillRowLabel(granVal, row);
@@ -2027,6 +2075,20 @@
       const count = Number(row[key]);
       if (!Number.isFinite(count) || count <= 0) return null;
       return { target: 'line', prefix, termKey: key, count, title: `Show the matching verses in ${label}` };
+    }
+    // Section/chapter n-gram counts open the scoped vocabulary view (the
+    // book-level count keeps opening the words & phrases modal for now)
+    if (key === 'ngram_count' && (granVal === 'genre' || granVal === 'act')) {
+      const count = Number(row[key]);
+      if (!Number.isFinite(count) || count <= 0) return null;
+      const target = vocabGranForN(getSelectedNgramModeValue());
+      return {
+        target,
+        prefix,
+        termKey: '',
+        count,
+        title: `Show the ${DRILL_NOUNS[target]} of ${label}`
+      };
     }
     const target = DRILL_TARGETS[granVal] && DRILL_TARGETS[granVal][key];
     if (!target) return null;
@@ -2092,6 +2154,30 @@
     doSearch();
   }
 
+  // From a vocabulary row into the location dimension: add the n-gram as a
+  // term column and require at least one hit of it in the target view.
+  function drillVocabNgram(spec) {
+    const scopeFilter = getSegmentsFiltersMap().get('location');
+    const termSpec = toTermSpec(spec.vocabNgram, 'exact');
+    if (!termSpec || !termSpec.n) return;
+    termSpec.display = 'count';
+    const specKey = termSpecKey(termSpec);
+    if (!getActiveTerms().some(t => termSpecKey(t, matchMode.value) === specKey)) {
+      extraTerms.push(termSpec);
+      renderExtraTerms();
+    }
+    const termIdx = getActiveTerms().findIndex(t => termSpecKey(t, matchMode.value) === specKey);
+    if (termIdx < 0) return;
+    gran.value = spec.target;
+    const filters = getSegmentsFiltersMap();
+    if (spec.keepScope && scopeFilter) filters.set('location', { ...scopeFilter });
+    for (const key of Array.from(filters.keys())) {
+      if (TERM_COUNT_KEY_RE.test(key)) filters.delete(key);
+    }
+    filters.set(`t${termIdx}_count`, { type: 'number', min: 1 });
+    doSearch();
+  }
+
   function buildDrillLink(spec) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -2100,9 +2186,85 @@
     btn.title = spec.title;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      drillTo(spec);
+      if (spec.vocabNgram) drillVocabNgram(spec);
+      else drillTo(spec);
     });
     return btn;
+  }
+
+  // --- Vocabulary granularities: rows are distinct n-grams -----------------
+  const vocabRowsCache = new Map();
+
+  function vocabIndexForN(n) {
+    return n === 2 ? tokens2 : n === 3 ? tokens3 : tokens;
+  }
+
+  function vocabColumnLabel(granVal) {
+    return granVal === 'bigram' ? 'Bigram' : granVal === 'trigram' ? 'Trigram' : 'Word';
+  }
+
+  function buildVocabularyRows(granVal) {
+    const n = vocabNFor(granVal);
+    const filters = getSegmentsFiltersMap();
+    const scopeFilter = filters.get('location');
+    let scopeRe = null;
+    if (scopeFilter && scopeFilter.type === 'text' && scopeFilter.pattern) {
+      try { scopeRe = new RegExp(scopeFilter.pattern, 'i'); } catch (_) { scopeRe = null; }
+    }
+    const nameFilterVersion = window.__nameFilterVersion || 0;
+    const cacheKey = `${n}|${scopeRe ? scopeRe.source : ''}|${vocabExcludeNames ? 1 : 0}|${nameFilterVersion}`;
+    let rows = vocabRowsCache.get(cacheKey);
+    if (!rows) {
+      const index = vocabIndexForN(n);
+      const totalBooks = plays.length || 39;
+      const scopePlayIds = new Set();
+      const raw = [];
+      for (const [ngram, postings] of Object.entries(index)) {
+        if (!Array.isArray(postings) || !postings.length) continue;
+        let tf = 0;
+        let verses = 0;
+        const bookSet = new Set();
+        for (const posting of postings) {
+          const chunk = chunkById.get(posting[0]);
+          if (!chunk) continue;
+          bookSet.add(chunk.play_id);
+          if (!scopeRe || scopeRe.test(String(chunk.location || ''))) {
+            tf += Number(posting[1]) || 0;
+            verses += 1;
+            scopePlayIds.add(chunk.play_id);
+          }
+        }
+        if (tf <= 0) continue;
+        const df = bookSet.size || 1;
+        raw.push({
+          ngram,
+          count: tf,
+          verse_count: verses,
+          book_count: df,
+          tfidf: Math.round(tf * Math.log(totalBooks / df) * 10000) / 10000
+        });
+      }
+      rows = raw;
+      if (vocabExcludeNames && typeof window.ngramContainsConfiguredName === 'function') {
+        const playIds = scopeRe ? Array.from(scopePlayIds) : plays.map(p => p.play_id);
+        rows = raw.filter(r => !playIds.some(pid => window.ngramContainsConfiguredName(r.ngram, pid)));
+      }
+      vocabRowsCache.set(cacheKey, rows);
+      if (vocabRowsCache.size > 12) vocabRowsCache.delete(vocabRowsCache.keys().next().value);
+    }
+    const cols = [
+      { key: 'ngram', label: vocabColumnLabel(granVal), defaultDir: 'asc', type: 'text' },
+      { key: 'count', label: 'Count', type: 'number', defaultDir: 'desc' },
+      { key: 'book_count', label: '# books', type: 'number', defaultDir: 'desc' },
+      { key: 'verse_count', label: '# verses', type: 'number', defaultDir: 'desc' },
+      {
+        key: 'tfidf', label: 'Unusualness', type: 'number', defaultDir: 'desc',
+        tooltip: 'Count within the current scope × ln(39 / books containing the term). Scoped, it surfaces terms distinctive of the scope; unscoped, terms concentrated in few books. Ubiquitous terms score 0.'
+      }
+    ];
+    setHeaders(cols);
+    ensureSegmentsSortForColumns(segmentsColumnDefs, 'count', 'desc');
+    return rows.slice();
   }
 
   function renderSegmentsPage() {
@@ -2119,6 +2281,8 @@
     const colTypeByKey = new Map(colDefs.map((c) => [c.key, c.type]));
     const numericRankIndex = buildNumericRankIndex(segmentsAllRows, colDefs);
     const granVal = gran.value;
+    const vocabToggle = document.getElementById('vocabNamesToggle');
+    if (vocabToggle) setElementHidden(vocabToggle, !isVocabGranularity(granVal));
 
     for (const r of paginatedRows) {
       const tr = document.createElement('tr');
@@ -2180,6 +2344,7 @@
         }
         if (k === 'title' || k === 'play_title') td.classList.add('book-cell');
         if (k === 'genre') td.classList.add('hebrew');
+        if (k === 'ngram') td.classList.add('hebrew');
         const rankHint = getNumericRankHint(numericRankIndex, k, r[k]);
         if (rankHint) {
           td.classList.add('ranked-cell');
@@ -2235,6 +2400,14 @@
       refreshSegmentsFromFilters();
       updateSegmentsFilterActions();
       updateDeepLink();
+    });
+  }
+
+  const vocabNamesCheckbox = document.getElementById('vocabNamesCheckbox');
+  if (vocabNamesCheckbox) {
+    vocabNamesCheckbox.addEventListener('change', () => {
+      vocabExcludeNames = !!vocabNamesCheckbox.checked;
+      doSearch();
     });
   }
 

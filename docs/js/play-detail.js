@@ -220,6 +220,8 @@
       o.added.forEach(term => addConfigName(filter, term));
       o.removed.forEach(term => removeConfigName(filter, term));
     }
+    // Version stamp lets the vocabulary views invalidate their caches
+    window.__nameFilterVersion = (window.__nameFilterVersion || 0) + 1;
   }
 
   function isTermExcluded(playId, phrase) {
@@ -899,4 +901,5 @@
 
   window.isPlayDetailCell = isPlayDetailCell;
   window.buildPlayDetailLink = buildPlayDetailLink;
+  window.ngramContainsConfiguredName = ngramContainsCharacterName;
 })();

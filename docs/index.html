@@ -87,24 +87,21 @@
           </label>
         </div>
       </div>
-      <div class="color-scale-legend"></div>
-      <div class="deep-link-wrap">
-        <strong>Deep Link:</strong>
-        <a class="deep-link" href="#" target="_blank" rel="noopener"></a>
-        <button type="button" class="copy-deep-link link-btn">Copy</button>
-      </div>
     </details>
 
-    <div class="color-scale-legend color-scale-legend-inline" title="Each numeric column is shaded from its lowest to highest value"></div>
+    <div class="table-toolbar">
+      <div id="segmentsFilterActions" class="filter-actions is-hidden">
+        <span class="label-strong">Filters:</span>
+        <span id="segmentsActiveFilters" class="active-filter-chips"></span>
+        <button id="clearSegmentsFilters" class="link-btn link-btn-no-padding">Clear all</button>
+      </div>
+      <div class="color-scale-legend color-scale-legend-inline" title="Each numeric column is shaded from its lowest to highest value"></div>
+    </div>
     <table id="results">
       <thead><tr id="headRow"></tr></thead>
       <tbody></tbody>
     </table>
-    <div id="segmentsFilterActions" class="filter-actions is-hidden">
-      <button id="clearSegmentsFilters" class="link-btn link-btn-no-padding">Clear all filters for this view</button>
-      <span class="muted filters-info" id="segmentsFiltersInfo"></span>
-    </div>
-    
+
     <div class="pagination is-hidden" id="segmentsPagination">
       <button id="segmentsFirstPage">First</button>
       <button id="segmentsPrevPage">Prev</button>
@@ -619,21 +616,58 @@
   function updateDeepLink() {
     const p = buildQueryParamsFromState();
     const search = '?' + p.toString();
-    const url = location.origin + location.pathname + search;
-    document.querySelectorAll('.deep-link').forEach(a => { a.href = url; a.textContent = url; });
     syncHistoryUrl(search);
+  }
+  function segmentsFilterColumnLabel(key) {
+    const def = (segmentsColumnDefs || []).find(c => c && c.key === key);
+    if (def && def.label) return def.label;
+    if (key === 'location') return 'Location';
+    return key;
+  }
+  function describeSegmentsFilterValue(v) {
+    if (v.type === 'text') {
+      const pattern = String(v.pattern || '');
+      if (pattern.startsWith('^')) {
+        // Drill filters are anchored escaped literals; show them plainly
+        const literal = pattern.slice(1).replace(/\\(.)/g, '$1');
+        if ('^' + escapeRegexText(literal) === pattern) return `starts with ${literal}`;
+      }
+      return `matches ${pattern}`;
+    }
+    const hasMin = v.min !== '' && v.min != null;
+    const hasMax = v.max !== '' && v.max != null;
+    if (hasMin && hasMax) return `${v.min}–${v.max}`;
+    if (hasMin) return `≥ ${v.min}`;
+    if (hasMax) return `≤ ${v.max}`;
+    return 'set';
   }
   function updateSegmentsFilterActions() {
     const container = document.getElementById('segmentsFilterActions');
     if (!container) return;
-    const count = getSegmentsFiltersMap().size;
-    if (count > 0) {
-      setElementHidden(container, false);
-      const info = document.getElementById('segmentsFiltersInfo');
-      if (info) info.textContent = `(${count} active filter${count>1?'s':''})`;
-    } else {
-      setElementHidden(container, true);
+    const filters = getSegmentsFiltersMap();
+    const chipsEl = document.getElementById('segmentsActiveFilters');
+    if (chipsEl) {
+      chipsEl.innerHTML = '';
+      for (const [key, v] of filters.entries()) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'active-filter-chip';
+        chip.dataset.filterKey = key;
+        chip.title = 'Remove this filter';
+        chip.setAttribute('dir', 'auto');
+        const label = document.createElement('strong');
+        label.textContent = segmentsFilterColumnLabel(key);
+        chip.appendChild(label);
+        chip.appendChild(document.createTextNode(` ${describeSegmentsFilterValue(v)}`));
+        const x = document.createElement('span');
+        x.className = 'chip-x';
+        x.setAttribute('aria-hidden', 'true');
+        x.textContent = '×';
+        chip.appendChild(x);
+        chipsEl.appendChild(chip);
+      }
     }
+    setElementHidden(container, filters.size === 0);
   }
   const loadingIndicator = document.getElementById('loadingIndicator');
   const loadingMessage = document.getElementById('loadingMessage');
@@ -2204,6 +2238,19 @@
     });
   }
 
+  // Remove a single filter via its chip
+  const activeFilterChipsEl = document.getElementById('segmentsActiveFilters');
+  if (activeFilterChipsEl) {
+    activeFilterChipsEl.addEventListener('click', (e) => {
+      const chip = e.target.closest('.active-filter-chip');
+      if (!chip || !chip.dataset.filterKey) return;
+      getSegmentsFiltersMap().delete(chip.dataset.filterKey);
+      refreshSegmentsFromFilters();
+      updateSegmentsFilterActions();
+      updateDeepLink();
+    });
+  }
+
   // Update deep link initially
   updateDeepLink();
   
@@ -2367,28 +2414,6 @@
   });
   syncHighlightToggles();
 
-  document.querySelectorAll('.copy-deep-link').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const wrap = btn.closest('.deep-link-wrap');
-      const link = wrap && wrap.querySelector('.deep-link');
-      const url = link && link.href;
-      if (!url) return;
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(url);
-        copied = true;
-      } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        document.body.appendChild(ta);
-        ta.select();
-        try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
-        ta.remove();
-      }
-      btn.textContent = copied ? 'Copied ✓' : 'Copy failed';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
-    });
-  });
 
   const addColumnsMobileBtn = document.getElementById('addColumnsMobile');
   if (addColumnsMobileBtn) {

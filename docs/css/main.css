@@ -353,22 +353,54 @@ td.ranked-cell {
 .commentator-filter-count {
   white-space: nowrap;
 }
-.deep-link-wrap {
-  margin-top: 0.25rem;
-  font-size: 0.95rem;
-}
-.deep-link {
-  word-break: break-all;
-  margin-left: 0.25rem;
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 -0.75rem;
 }
 .filter-actions {
-  margin-top: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.active-filter-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.active-filter-chip {
+  background: #f7efe6;
+  border: 1px solid var(--border);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.12rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.active-filter-chip strong {
+  margin-right: 0.3rem;
+}
+.active-filter-chip:hover {
+  background: #efe2d2;
+  color: var(--burgundy);
+  box-shadow: none;
+}
+.active-filter-chip .chip-x {
+  margin-left: 0.35rem;
+  color: #8a8a8a;
+}
+.active-filter-chip:hover .chip-x {
+  color: var(--burgundy);
 }
 .link-btn-no-padding {
   padding: 0;
-}
-.filters-info {
-  margin-left: 0.35rem;
 }
 .muted { 
   color: #665544;
@@ -531,10 +563,10 @@ input[type="checkbox"] {
 .legend-wrap { display: inline-flex; gap: 4px; align-items: center; margin-top: 4px; }
 .legend-swatch { width: 26px; height: 14px; border: 1px solid var(--border); border-radius: 2px; display: inline-block; }
 .legend-labels { display: flex; justify-content: space-between; gap: 2rem; font-size: 0.85rem; color: #665544; margin-top: 2px; max-width: 220px; }
-/* Compact legend pinned above the results table (the drawer copy stays too) */
+/* Compact legend in the toolbar row above the results table */
 .color-scale-legend-inline {
   width: fit-content;
-  margin: 0.75rem 0 -0.75rem auto;
+  margin-left: auto;
 }
 .color-scale-legend-inline .legend-labels {
   max-width: none;

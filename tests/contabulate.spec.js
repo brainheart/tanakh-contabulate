@@ -80,7 +80,8 @@ test('count cells drill down through the granularities', async ({ page }) => {
   await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('act');
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(50 total rows)');
-  await expect(page.locator('#segmentsFiltersInfo')).toContainText('1 active filter');
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toHaveCount(1);
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.Gen.');
 
   // Chapters → the 31 verses of Genesis 1
   await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
@@ -112,7 +113,12 @@ test('ancestor name cells filter the current view to their scope', async ({ page
   await page.locator('#results tbody tr').first().locator('td:nth-child(3) .drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('play');
   await expect(page.locator('#results tbody tr')).toHaveCount(5);
-  await expect(page.locator('#segmentsFiltersInfo')).toContainText('1 active filter');
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toHaveCount(1);
+
+  // Clicking the chip removes that filter
+  await page.locator('#segmentsActiveFilters .active-filter-chip').click();
+  await expect(page.locator('#results tbody tr')).toHaveCount(39);
+  await expect(page.locator('#segmentsFilterActions')).toBeHidden();
 
   // Book cell in the full chapters view filters to that book's chapters
   await page.goto('/');

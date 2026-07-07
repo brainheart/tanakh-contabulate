@@ -2595,6 +2595,10 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       clearAddColumnPrompt(true);
+      if (isVocabGranularity(gran.value)) {
+        applyVocabNgramFilter();
+        return;
+      }
       const added = addExtraTerm(q.value);
       if (added) q.value = '';
     }
@@ -2643,9 +2647,26 @@
     if (val.trim()) scheduleAddColumnPrompt();
     else clearAddColumnPrompt(true);
   });
+  // At vocabulary granularities the rows ARE terms, so the search box
+  // filters the n-gram column instead of creating term columns.
+  function applyVocabNgramFilter() {
+    const text = q.value.trim();
+    if (!text) return false;
+    const normalized = normalizeTerm(text);
+    const pattern = matchMode.value === 'regex' ? normalized : escapeRegexText(normalized);
+    getSegmentsFiltersMap().set('ngram', { type: 'text', pattern });
+    clearTermWarning();
+    q.value = '';
+    doSearch();
+    return true;
+  }
   if (addColumnBtn) {
     addColumnBtn.addEventListener('click', () => {
       clearAddColumnPrompt(true);
+      if (isVocabGranularity(gran.value)) {
+        if (applyVocabNgramFilter()) q.focus();
+        return;
+      }
       const added = addExtraTerm(q.value);
       if (added) {
         q.value = '';

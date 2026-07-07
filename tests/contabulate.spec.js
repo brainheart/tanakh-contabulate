@@ -151,6 +151,13 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   await page.setChecked('#vocabNamesCheckbox', false);
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(39615 total rows)');
 
+  // The search box filters the Word column here instead of adding term columns
+  await page.fill('#q', 'אלהים');
+  await page.locator('#addColumnBtn').click();
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('matches אלהים');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(10 total rows)');
+  await page.locator('#segmentsActiveFilters .active-filter-chip').click();
+
   // A chapter's word count drills into its scoped vocabulary
   await page.selectOption('#gran', 'act');
   await page.locator('#results tbody tr').first().locator('button.drill-link[title*="words of"]').click();

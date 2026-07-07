@@ -185,12 +185,14 @@ def parse_book(xml_path: Path) -> list[dict]:
             verse_ref = verse_elem.attrib.get("osisID", "")
             verse_num = int(verse_ref.split(".")[-1])
             parts = []
+            word_parts = []
             for child in verse_elem:
                 local = child.tag.rsplit("}", 1)[-1]
                 if local == "w":
                     word = extract_word_text(child)
                     if word:
                         parts.append(word)
+                        word_parts.append(word)
                 elif local == "seg":
                     punctuation = seg_text(child)
                     if punctuation:
@@ -202,6 +204,9 @@ def parse_book(xml_path: Path) -> list[dict]:
                     "chapter": chapter_num,
                     "verse": verse_num,
                     "text": text,
+                    # Words only: keeps layout segs (the setumah/petuchah
+                    # parashah markers ס and פ) out of the token stream
+                    "token_text": " ".join(word_parts),
                 }
             )
     return verses
@@ -331,7 +336,7 @@ def build(source_dir: Path, out_dir: Path) -> None:
         chapter_numbers = sorted({verse["chapter"] for verse in verses})
 
         for verse in verses:
-            verse_tokens = tokenize_hebrew(verse["text"])
+            verse_tokens = tokenize_hebrew(verse["token_text"])
             if not verse_tokens:
                 continue
 

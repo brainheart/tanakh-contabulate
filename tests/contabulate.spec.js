@@ -144,11 +144,11 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   await expect(page.locator('#vocabNamesToggle')).toBeVisible();
 
   // Names are visible by default; hiding them shrinks the vocabulary
-  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39617 total rows)');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39615 total rows)');
   await page.setChecked('#vocabNamesCheckbox', true);
-  await expect(page.locator('#segmentsTotalInfo')).toContainText('(35174 total rows)');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(35172 total rows)');
   await page.setChecked('#vocabNamesCheckbox', false);
-  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39617 total rows)');
+  await expect(page.locator('#segmentsTotalInfo')).toContainText('(39615 total rows)');
 
   // A chapter's word count drills into its scoped vocabulary
   await page.selectOption('#gran', 'act');

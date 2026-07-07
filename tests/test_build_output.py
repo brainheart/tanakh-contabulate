@@ -96,6 +96,28 @@ def test_name_filter_config_lists_proper_nouns_per_book():
     assert "אלהים" not in additions["Gen"]
 
 
+def test_token_stream_and_per_verse_text_metrics():
+    tokens = load_json(DATA / "tokens.json")
+    # Parashah layout markers (setumah/petuchah) must not be tokenized as words
+    assert "ס" not in tokens
+    assert "פ" not in tokens
+
+    chunks = load_json(DATA / "chunks.json")
+    assert {"name_count", "aramaic_count", "hapax_count"} <= set(chunks[0])
+    sums = {}
+    for c in chunks:
+        b = sums.setdefault(c["play_abbr"], [0, 0, 0, 0])
+        b[0] += c["name_count"]
+        b[1] += c["aramaic_count"]
+        b[2] += c["hapax_count"]
+        b[3] += c["total_words"]
+    assert sums["Dan"][1] / sums["Dan"][3] > 0.5  # Daniel is majority Aramaic
+    assert sums["Gen"][1] == 2  # Laban's two Aramaic words (Gen 31:47)
+    assert sums["Prov"][1] == 0  # no Aramaic in Proverbs
+    assert sums["1Chr"][0] / sums["1Chr"][3] > 0.25  # Chronicles is name-dense
+    assert sums["Song"][2] / sums["Song"][3] > 0.15  # Song of Songs hapax density
+
+
 def test_token_indexes_include_common_hebrew_terms():
     tokens = load_json(DATA / "tokens.json")
     tokens2 = load_json(DATA / "tokens2.json")

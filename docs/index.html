@@ -170,6 +170,12 @@
       tooltip: 'How rare the vocabulary is: each word is scored by its rarity in the whole corpus (−log10 of its frequency share), averaged over the row’s words. Higher = rarer vocabulary.' },
     { code: 'mattr', key: 'mattr_50', label: 'Vocab Diversity', decimals: 3, granOnly: ['play'],
       tooltip: 'Vocabulary diversity (MATTR-50): type–token ratio averaged over a moving 50-word window, 0–1. Higher = more varied vocabulary; comparable across texts of different lengths. Available at Book level.' },
+    { code: 'names', key: 'name_share', label: '% Names', decimals: 1,
+      tooltip: 'Share of words tagged as proper names in the morphhb morphology. Higher = more name-dense text (genealogies, chronicles, narrative).' },
+    { code: 'aram', key: 'aramaic_share', label: '% Aramaic', decimals: 1,
+      tooltip: 'Share of words tagged as Aramaic. The Tanakh is Hebrew apart from parts of Daniel and Ezra, one verse of Jeremiah, and two words of Genesis.' },
+    { code: 'hapax', key: 'hapax_share', label: '% Hapax', decimals: 1,
+      tooltip: 'Share of word forms that appear nowhere else in the Tanakh (hapax legomena). Higher = more unique vocabulary.' },
   ];
   let enabledMetricCodes = [];
   const metricToggles = Array.from(document.querySelectorAll('.metric-col-toggle'));
@@ -1017,9 +1023,10 @@
   const metricAggs = { act: new Map(), play: new Map(), genre: new Map() };
   function addMetricSums(map, k, r) {
     let s = map.get(k);
-    if (!s) { s = { tw: 0, sc: 0, cc: 0, rs: 0 }; map.set(k, s); }
+    if (!s) { s = { tw: 0, sc: 0, cc: 0, rs: 0, nc: 0, ac: 0, hc: 0 }; map.set(k, s); }
     s.tw += r.total_words || 0; s.sc += r.sentence_count || 0;
     s.cc += r.char_count || 0; s.rs += r.rarity_sum || 0;
+    s.nc += r.name_count || 0; s.ac += r.aramaic_count || 0; s.hc += r.hapax_count || 0;
   }
   for (const r of chunks) {
     addMetricSums(metricAggs.act, `${r.play_id}:${r.act}`, r);
@@ -1030,7 +1037,7 @@
     if (granVal === 'scene' || granVal === 'line') {
       // verses are both chunks and lines here; line rows carry line_num === scene_id
       const m = chunkById.get(granVal === 'scene' ? row.scene_id : row.line_num);
-      return m ? { tw: m.total_words||0, sc: m.sentence_count||0, cc: m.char_count||0, rs: m.rarity_sum||0 } : null;
+      return m ? { tw: m.total_words||0, sc: m.sentence_count||0, cc: m.char_count||0, rs: m.rarity_sum||0, nc: m.name_count||0, ac: m.aramaic_count||0, hc: m.hapax_count||0 } : null;
     }
     if (granVal === 'act') return metricAggs.act.get(`${row.play_id}:${row.act}`) || null;
     if (granVal === 'play') return metricAggs.play.get(row.play_id) || null;
@@ -1060,6 +1067,9 @@
           if (d.key === 'words_per_sentence') v = s.sc > 0 ? roundTo(s.tw / s.sc, d.decimals) : null;
           else if (d.key === 'mean_word_length') v = s.tw > 0 ? roundTo(s.cc / s.tw, d.decimals) : null;
           else if (d.key === 'lexical_rarity') v = s.tw > 0 ? roundTo(s.rs / s.tw, d.decimals) : null;
+          else if (d.key === 'name_share') v = s.tw > 0 ? roundTo((s.nc / s.tw) * 100, d.decimals) : null;
+          else if (d.key === 'aramaic_share') v = s.tw > 0 ? roundTo((s.ac / s.tw) * 100, d.decimals) : null;
+          else if (d.key === 'hapax_share') v = s.tw > 0 ? roundTo((s.hc / s.tw) * 100, d.decimals) : null;
         }
         row[d.key] = v;
       }

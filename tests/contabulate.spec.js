@@ -19,6 +19,7 @@ test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   const popover = page.locator('.add-column-popover');
   await expect(popover).toBeVisible();
   await expect(popover.locator('.add-column-option', { hasText: 'Words/Sentence' })).toBeVisible();
+  await expect(popover.locator('.add-column-option', { hasText: '% Aramaic' })).toBeVisible();
   await popover.locator('.add-column-search').fill('rashi');
   const rashiOption = popover.locator('.add-column-option', { hasText: 'Rashi' });
   await expect(rashiOption).toHaveCount(1);

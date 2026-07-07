@@ -186,6 +186,8 @@ def parse_book(xml_path: Path) -> list[dict]:
             verse_num = int(verse_ref.split(".")[-1])
             parts = []
             word_parts = []
+            name_count = 0
+            aramaic_count = 0
             for child in verse_elem:
                 local = child.tag.rsplit("}", 1)[-1]
                 if local == "w":
@@ -193,6 +195,11 @@ def parse_book(xml_path: Path) -> list[dict]:
                     if word:
                         parts.append(word)
                         word_parts.append(word)
+                        morph = child.attrib.get("morph", "")
+                        if NAME_MORPH_RE.search(morph):
+                            name_count += 1
+                        if morph.startswith("A"):
+                            aramaic_count += 1
                 elif local == "seg":
                     punctuation = seg_text(child)
                     if punctuation:
@@ -207,6 +214,8 @@ def parse_book(xml_path: Path) -> list[dict]:
                     # Words only: keeps layout segs (the setumah/petuchah
                     # parashah markers ס and פ) out of the token stream
                     "token_text": " ".join(word_parts),
+                    "name_count": name_count,
+                    "aramaic_count": aramaic_count,
                 }
             )
     return verses
@@ -372,6 +381,8 @@ def build(source_dir: Path, out_dir: Path) -> None:
                 "verse_count": 1,
                 "characters_present_count": 0,
                 "sentence_count": count_sentences(verse["text"]),
+                "name_count": verse["name_count"],
+                "aramaic_count": verse["aramaic_count"],
             }
             chunk_row.update(verse_commentary_fields)
             chunks.append(chunk_row)
@@ -435,16 +446,21 @@ def build(source_dir: Path, out_dir: Path) -> None:
     tok_rarity = {tok: -math.log10(f / corpus_total) for tok, f in corpus_freq.items()}
     verse_chars = {}
     verse_rarity = {}
+    verse_hapax = {}
     for tok, postings in tokens.items():
         length = len(tok)
         rarity = tok_rarity[tok]
+        is_hapax = corpus_freq[tok] == 1
         for vid, count in postings:
             verse_chars[vid] = verse_chars.get(vid, 0) + length * count
             verse_rarity[vid] = verse_rarity.get(vid, 0.0) + rarity * count
+            if is_hapax:
+                verse_hapax[vid] = verse_hapax.get(vid, 0) + count
     for chunk_row in chunks:
         vid = chunk_row["scene_id"]
         chunk_row["char_count"] = verse_chars.get(vid, 0)
         chunk_row["rarity_sum"] = round(verse_rarity.get(vid, 0.0), 3)
+        chunk_row["hapax_count"] = verse_hapax.get(vid, 0)
 
     canonical_ids = {chunk_row["canonical_id"] for chunk_row in chunks}
     commentary_detail_books = write_commentary_details(project_root, out_dir, canonical_ids)

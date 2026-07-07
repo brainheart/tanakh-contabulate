@@ -1,3 +1,4 @@
+import datetime
 import json
 import math
 import re
@@ -467,6 +468,27 @@ def build(source_dir: Path, out_dir: Path) -> None:
     if commentary_detail_books:
         commentary_metadata["detail_path_template"] = "commentary/{book}.json"
         commentary_metadata["detail_books"] = commentary_detail_books
+
+    instance_meta_path = project_root / "instance-meta.json"
+    instance_meta = json.loads(instance_meta_path.read_text(encoding="utf-8")) if instance_meta_path.exists() else {}
+    instance_payload = {
+        "schema": 1,
+        **instance_meta,
+        "updated": datetime.date.today().isoformat(),
+        "stats": {
+            "texts": len(plays),
+            "text_label": instance_meta.get("text_label", "books"),
+            "segments": len(chunks),
+            "segment_label": instance_meta.get("segment_label", "verses"),
+            "words": sum(p.get("total_words", 0) for p in plays),
+            "distinct_words": len(tokens),
+        },
+    }
+    instance_payload.pop("text_label", None)
+    instance_payload.pop("segment_label", None)
+    (out_dir / "instance.json").write_text(
+        json.dumps(instance_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     write_json(data_dir / "plays.json", plays)
     write_json(data_dir / "characters.json", characters)

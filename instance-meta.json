@@ -1,0 +1,25 @@
+{
+  "id": "tanakh",
+  "emoji": "🕎",
+  "title": "Tanakh",
+  "tagline": "Hebrew Bible Tabular Explorer",
+  "language": "Hebrew",
+  "url": "https://tanakh.contabulate.org/",
+  "source": "https://github.com/brainheart/tanakh-contabulate",
+  "text_label": "books",
+  "segment_label": "verses",
+  "sample_queries": [
+    {
+      "label": "Which are the most \"God\"-less books in the Hebrew Bible?",
+      "url": "https://tanakh.contabulate.org/?cs=1&zr=1&hl=1&q=%D7%99%D7%94%D7%95%D7%94%7C%D7%90%D7%9C%D7%94%D7%99%D7%9D&nm=1&gran=play&mm=regex&ts=%255B%257B%2522t%2522%253A%2522%25D7%2599%25D7%2594%25D7%2595%25D7%2594%257C%25D7%2590%25D7%259C%25D7%2594%25D7%2599%25D7%259D%2522%252C%2522m%2522%253A%2522regex%2522%252C%2522n%2522%253A1%252C%2522d%2522%253A%2522count%2522%257D%255D&sk=t0_count&sd=asc&co=location%2Ctitle%2Cgenre%2Cnum_chapters%2Cnum_lines%2Cngram_count%2Ct0_count"
+    },
+    {
+      "label": "What is the only book in the Tanakh not in the Torah to make it to the top five books by commentator interest?",
+      "url": "https://tanakh.contabulate.org/?cs=1&zr=0&commentators=rashi%2Cramban&hl=1&q=&nm=1&gran=play&mm=exact&sk=commentary_interest&sd=desc&co=location%2Ctitle%2Cgenre%2Cnum_chapters%2Cnum_lines%2Ccommentary_interest%2Ccommentary_rashi%2Ccommentary_ramban%2Cngram_count"
+    },
+    {
+      "label": "What were Rashi's favorite (most-cited) verses, compared with Ramban and other commentators?",
+      "url": "https://tanakh.contabulate.org/?cs=1&zr=0&commentators=rashi%2Cramban&hl=1&q=&nm=1&gran=verse&mm=exact&sk=commentary_rashi&sd=desc&co=location%2Cplay_title%2Cact%2Cscene%2Cline%2Ccommentary_rashi%2Ccommentary_ramban%2Ccommentary_interest%2Cngram_count"
+    }
+  ]
+}

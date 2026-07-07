@@ -118,6 +118,14 @@ def test_token_stream_and_per_verse_text_metrics():
     assert sums["Song"][2] / sums["Song"][3] > 0.15  # Song of Songs hapax density
 
 
+def test_instance_json_published():
+    instance = load_json(DOCS / "instance.json")
+    assert instance["id"] == "tanakh"
+    assert instance["stats"]["texts"] == 39
+    assert instance["stats"]["segments"] == 23213
+    assert len(instance["sample_queries"]) == 3
+
+
 def test_token_indexes_include_common_hebrew_terms():
     tokens = load_json(DATA / "tokens.json")
     tokens2 = load_json(DATA / "tokens2.json")

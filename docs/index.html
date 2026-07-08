@@ -488,8 +488,11 @@
   let nameEditorOpen = false;
   function getSegmentsFiltersMap() {
     const g = normalizeGranularity(typeof gran !== 'undefined' && gran ? gran.value : 'line');
-    if (!segmentsFiltersByGran.has(g)) segmentsFiltersByGran.set(g, new Map());
-    return segmentsFiltersByGran.get(g);
+    // Word/bigram/trigram share one scope: switching the n-gram size keeps
+    // the location/genre filters (and the n-gram text filter) in place.
+    const key = isVocabGranularity(g) ? 'vocab' : g;
+    if (!segmentsFiltersByGran.has(key)) segmentsFiltersByGran.set(key, new Map());
+    return segmentsFiltersByGran.get(key);
   }
   // Drill-down constants (declared early: deep links render before the
   // drill helpers further down are reached in source order)
@@ -2170,7 +2173,9 @@
   // From a vocabulary row into the location dimension: add the n-gram as a
   // term column and require at least one hit of it in the target view.
   function drillVocabNgram(spec) {
-    const scopeFilter = getSegmentsFiltersMap().get('location');
+    const vocabFilters = getSegmentsFiltersMap();
+    const scopeFilter = vocabFilters.get('location');
+    const genreFilter = vocabFilters.get('genre');
     const termSpec = toTermSpec(spec.vocabNgram, 'exact');
     if (!termSpec || !termSpec.n) return;
     termSpec.display = 'count';
@@ -2183,7 +2188,12 @@
     if (termIdx < 0) return;
     gran.value = spec.target;
     const filters = getSegmentsFiltersMap();
+    // The target view shows exactly what the count promised: carry the
+    // vocabulary scope when asked to, and clear any stale scope otherwise.
     if (spec.keepScope && scopeFilter) filters.set('location', { ...scopeFilter });
+    else filters.delete('location');
+    if (spec.keepScope && genreFilter) filters.set('genre', { ...genreFilter });
+    else filters.delete('genre');
     for (const key of Array.from(filters.keys())) {
       if (TERM_COUNT_KEY_RE.test(key)) filters.delete(key);
     }

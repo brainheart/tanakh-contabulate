@@ -251,3 +251,16 @@ test('maps legacy verse URL granularities to text-backed Verse view', async ({ p
   headers = await page.locator('#results thead th').allTextContents();
   expect(headers.some((text) => text.includes('Verse'))).toBeTruthy();
 });
+
+test('vocabulary scope survives switching the n-gram size', async ({ page }) => {
+  await page.goto('/?gran=word&s_ft_location=%5E01%5C.01%5C.');
+  await page.waitForFunction(() => window.__contabulateReady === true);
+  await page.waitForSelector('#results tbody tr', { timeout: 10000 });
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
+  // Switching word -> bigram keeps the same scope in place
+  await page.selectOption('#gran', 'bigram');
+  await page.waitForSelector('#results tbody tr', { timeout: 10000 });
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
+  await page.selectOption('#gran', 'trigram');
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
+});

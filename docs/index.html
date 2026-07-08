@@ -486,13 +486,30 @@
   }
   let vocabExcludeNames = false;
   let nameEditorOpen = false;
+  // Word/bigram/trigram share one filter map, so switching the n-gram size
+  // keeps the location/genre scope (and the n-gram text filter) in place.
+  function segmentsFilterMapKey(value) {
+    const g = normalizeGranularity(value);
+    return isVocabGranularity(g) ? 'vocab' : g;
+  }
   function getSegmentsFiltersMap() {
-    const g = normalizeGranularity(typeof gran !== 'undefined' && gran ? gran.value : 'line');
-    // Word/bigram/trigram share one scope: switching the n-gram size keeps
-    // the location/genre filters (and the n-gram text filter) in place.
-    const key = isVocabGranularity(g) ? 'vocab' : g;
+    const key = segmentsFilterMapKey(typeof gran !== 'undefined' && gran ? gran.value : 'line');
     if (!segmentsFiltersByGran.has(key)) segmentsFiltersByGran.set(key, new Map());
     return segmentsFiltersByGran.get(key);
+  }
+  // The location/genre scope follows manual granularity switches: what you
+  // are looking at stays what you are looking at, one level up or down.
+  let lastGranValue = null;
+  function carryScopeFilters(fromGranValue) {
+    if (fromGranValue == null) return;
+    const fromMap = segmentsFiltersByGran.get(segmentsFilterMapKey(fromGranValue));
+    const toMap = getSegmentsFiltersMap();
+    if (!fromMap || fromMap === toMap) return;
+    for (const k of ['location', 'genre']) {
+      const v = fromMap.get(k);
+      if (v) toMap.set(k, { ...v });
+      else toMap.delete(k);
+    }
   }
   // Drill-down constants (declared early: deep links render before the
   // drill helpers further down are reached in source order)
@@ -1970,6 +1987,7 @@
       // At vocabulary granularities the location filter is a scope applied
       // while building rows (they have no location field of their own)
       if (key === 'location' && isVocabGranularity(gran.value)) continue;
+      if (key === 'location' && gran.value === 'genre') continue;
       const type = f.type || 'text';
       if (type === 'number') {
         const hasMin = f.min != null && f.min !== '';
@@ -1987,6 +2005,19 @@
         });
       } else {
         if (!f.pattern) continue;
+        // Anchored location prefixes are subtree scopes: finer views show
+        // the scope's descendants, coarser views its containing rows (so
+        // zooming out never comes up empty).
+        if (key === 'location' && f.pattern.startsWith('^') && !f.pattern.endsWith('$')) {
+          const literal = f.pattern.slice(1).replace(/\\(.)/g, '$1');
+          if ('^' + escapeRegexText(literal) === f.pattern) {
+            out = out.filter(r => {
+              const loc = String(r[key] ?? '') + '.';
+              return loc.startsWith(literal) || literal.startsWith(loc);
+            });
+            continue;
+          }
+        }
         let re = null;
         try { re = new RegExp(f.pattern, 'i'); } catch(e) { re = null; }
         if (!re) continue;
@@ -2580,6 +2611,7 @@
 
   async function doSearch(preferredSortTermIndex = null){
     const requestId = ++segmentsSearchRequestId;
+    lastGranValue = gran.value;
     pruneExtraTermsAgainstPrimary();
     renderExtraTerms();
     if (gran.value === 'line' && (!Array.isArray(allLines) || allLines.length === 0)) {
@@ -2685,7 +2717,10 @@
     });
   }
   ngramMode.addEventListener('change', doSearch);
-  gran.addEventListener('change', doSearch);
+  gran.addEventListener('change', () => {
+    carryScopeFilters(lastGranValue);
+    doSearch();
+  });
   matchMode.addEventListener('change', () => {
     clearTermWarning();
     updateSegmentsMatchModeUI();

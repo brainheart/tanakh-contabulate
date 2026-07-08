@@ -263,4 +263,12 @@ test('vocabulary scope survives switching the n-gram size', async ({ page }) => 
   await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
   await page.selectOption('#gran', 'trigram');
   await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
+  // ...and carries into the location granularities
+  await page.selectOption('#gran', 'act');
+  await page.waitForSelector('#results tbody tr', { timeout: 10000 });
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
+  // Jumping coarser than the scope shows its containing row, not nothing
+  await page.selectOption('#gran', 'play');
+  await expect(page.locator('#results tbody tr')).toHaveCount(1);
+  await expect(page.locator('#segmentsActiveFilters .active-filter-chip')).toContainText('starts with 01.01.');
 });

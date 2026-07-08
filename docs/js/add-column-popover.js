@@ -134,31 +134,35 @@
       });
     }
 
-    let commentators = deps.getCommentators()
-      .filter(item => matchesFilter(`${item.label} ${item.key}`, searchText));
-    if (sortMode === 'count') {
-      commentators = commentators.slice().sort((a, b) =>
-        (b.referenceCount - a.referenceCount) || a.label.localeCompare(b.label));
+    // Corpora without commentary data skip the commentators group entirely
+    const allCommentators = deps.getCommentators();
+    if (allCommentators.length) {
+      let commentators = allCommentators
+        .filter(item => matchesFilter(`${item.label} ${item.key}`, searchText));
+      if (sortMode === 'count') {
+        commentators = commentators.slice().sort((a, b) =>
+          (b.referenceCount - a.referenceCount) || a.label.localeCompare(b.label));
+      }
+      list.appendChild(groupHead(
+        `Commentators (${commentators.length.toLocaleString('en-US')})`,
+        buildSortControl()
+      ));
+      if (!commentators.length) {
+        const empty = document.createElement('div');
+        empty.className = 'add-column-empty muted';
+        empty.textContent = 'No matching commentators.';
+        list.appendChild(empty);
+      }
+      commentators.forEach((item) => {
+        list.appendChild(makeOption({
+          label: item.label,
+          count: deps.formatCount(item.referenceCount),
+          selected: deps.isCommentatorSelected(item.key),
+          tooltip: `Comment counts by ${item.label}`,
+          onToggle: () => deps.toggleCommentator(item.key)
+        }));
+      });
     }
-    list.appendChild(groupHead(
-      `Commentators (${commentators.length.toLocaleString('en-US')})`,
-      buildSortControl()
-    ));
-    if (!commentators.length) {
-      const empty = document.createElement('div');
-      empty.className = 'add-column-empty muted';
-      empty.textContent = 'No matching commentators.';
-      list.appendChild(empty);
-    }
-    commentators.forEach((item) => {
-      list.appendChild(makeOption({
-        label: item.label,
-        count: deps.formatCount(item.referenceCount),
-        selected: deps.isCommentatorSelected(item.key),
-        tooltip: `Comment counts by ${item.label}`,
-        onToggle: () => deps.toggleCommentator(item.key)
-      }));
-    });
 
     list.scrollTop = prevScroll;
   }
@@ -177,7 +181,9 @@
     const search = document.createElement('input');
     search.type = 'search';
     search.className = 'add-column-search';
-    search.placeholder = 'Search commentators and metrics...';
+    search.placeholder = deps.getCommentators().length
+      ? 'Search commentators and metrics...'
+      : 'Search metrics...';
     search.setAttribute('autocomplete', 'off');
     search.value = searchText;
     search.addEventListener('input', () => {

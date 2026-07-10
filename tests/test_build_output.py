@@ -121,8 +121,11 @@ def test_token_stream_and_per_verse_text_metrics():
 def test_instance_json_published():
     instance = load_json(DOCS / "instance.json")
     assert instance["id"] == "tanakh"
+    assert instance["created"] == "2026-03-31"
     assert instance["stats"]["texts"] == 39
     assert instance["stats"]["segments"] == 23213
+    assert instance["stats"]["commentaries"] == 74
+    assert instance["stats"]["comments"] == 337182
     assert len(instance["sample_queries"]) == 3
 
 

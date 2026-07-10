@@ -4,6 +4,7 @@
   "title": "Tanakh",
   "tagline": "Hebrew Bible Tabular Explorer",
   "language": "Hebrew",
+  "created": "2026-03-31",
   "url": "https://tanakh.contabulate.org/",
   "source": "https://github.com/brainheart/tanakh-contabulate",
   "text_label": "books",

@@ -5,6 +5,7 @@
   "title": "Tanakh",
   "tagline": "Hebrew Bible Tabular Explorer",
   "language": "Hebrew",
+  "created": "2026-03-31",
   "url": "https://tanakh.contabulate.org/",
   "source": "https://github.com/brainheart/tanakh-contabulate",
   "sample_queries": [
@@ -21,13 +22,15 @@
       "url": "https://tanakh.contabulate.org/?cs=1&zr=0&commentators=rashi%2Cramban&hl=1&q=&nm=1&gran=verse&mm=exact&sk=commentary_rashi&sd=desc&co=location%2Cplay_title%2Cact%2Cscene%2Cline%2Ccommentary_rashi%2Ccommentary_ramban%2Ccommentary_interest%2Cngram_count"
     }
   ],
-  "updated": "2026-07-07",
+  "updated": "2026-07-10",
   "stats": {
     "texts": 39,
     "text_label": "books",
     "segments": 23213,
     "segment_label": "verses",
     "words": 305507,
-    "distinct_words": 39615
+    "distinct_words": 39615,
+    "commentaries": 74,
+    "comments": 337182
   }
 }

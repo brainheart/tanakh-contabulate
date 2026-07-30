@@ -143,6 +143,7 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   await expect(page.locator('#results thead th[data-key="ngram"]')).toHaveCount(1);
   await expect(page.locator('#results thead th[data-key="unusualness"]')).toHaveCount(1);
   await expect(page.locator('#vocabNamesToggle')).toBeVisible();
+  await expect(page.locator('#vocabNamesUnavailable')).toBeHidden();
 
   // Names are visible by default; hiding them shrinks the vocabulary
   await expect(page.locator('#segmentsTotalInfo')).toContainText('(39615 total rows)');
@@ -214,7 +215,7 @@ test('the proper-name list is editable in a book-scoped vocabulary view', async 
   const firstNgram = (await page.locator('#results tbody tr').first().locator('td:nth-child(1) span').textContent()).trim();
   await page.locator('#results tbody tr').first().locator('.ngram-exclude-btn').click();
   await expect(page.locator('#nameFilterEditor summary')).toContainText('51 proper-name terms');
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('tanakhNameFilterOverrides')));
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('contabulateNameFilterOverrides')));
   expect(stored.Ruth.added).toContain(firstNgram);
 
   // Turning on "Hide proper names" removes it from the rows

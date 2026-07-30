@@ -514,6 +514,11 @@ def build(source_dir: Path, out_dir: Path) -> None:
     write_json(
         data_dir / "character_name_filter_config.json",
         {
+            "enabled": True,
+            "source": (
+                "Proper-noun surface forms tagged in the morphhb morphology, "
+                "generated per book."
+            ),
             "global_additions": [],
             "global_removals": [],
             "play_additions": name_filter_play_additions,

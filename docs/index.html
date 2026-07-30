@@ -101,6 +101,7 @@
       <label id="vocabNamesToggle" class="vocab-names-toggle is-hidden" title="Hide word forms tagged as proper names in the morphhb morphology for the books in scope; the list is editable below when scoped to one book">
         <input type="checkbox" id="vocabNamesCheckbox"> Hide proper names
       </label>
+      <span id="vocabNamesUnavailable" class="muted is-hidden">Proper-name filtering isn’t available for this corpus yet.</span>
       <div class="color-scale-legend color-scale-legend-inline" title="Each numeric column is shaded from its lowest to highest value"></div>
     </div>
     <div id="nameFilterEditor" class="is-hidden"></div>
@@ -2263,10 +2264,16 @@
     return matches.length === 1 ? matches[0] : null;
   }
 
+  function nameFilterDataAvailable() {
+    return !!(window.nameFilterEditor
+      && typeof window.nameFilterEditor.isAvailable === 'function'
+      && window.nameFilterEditor.isAvailable());
+  }
+
   function renderNameFilterEditor() {
     const container = document.getElementById('nameFilterEditor');
     if (!container) return;
-    const play = isVocabGranularity(gran.value) ? vocabScopeSinglePlay() : null;
+    const play = (isVocabGranularity(gran.value) && nameFilterDataAvailable()) ? vocabScopeSinglePlay() : null;
     if (!play || !window.nameFilterEditor) {
       container.innerHTML = '';
       setElementHidden(container, true);
@@ -2350,13 +2357,13 @@
         });
       }
       rows = raw;
-      if (vocabExcludeNames && typeof window.ngramContainsConfiguredName === 'function') {
+      if (vocabExcludeNames && nameFilterDataAvailable() && typeof window.ngramContainsConfiguredName === 'function') {
         const playIds = scopeRe ? Array.from(scopePlayIds) : plays.map(p => p.play_id);
         rows = raw.filter(r => !playIds.some(pid => window.ngramContainsConfiguredName(r.ngram, pid)));
       }
       // Flag proper-name rows when a single book is in scope so the renderer
       // can dim them and offer per-row hide/unhide
-      const editablePlay = vocabScopeSinglePlay();
+      const editablePlay = nameFilterDataAvailable() ? vocabScopeSinglePlay() : null;
       if (editablePlay && typeof window.ngramContainsConfiguredName === 'function') {
         for (const row of rows) {
           row.name_hit = window.ngramContainsConfiguredName(row.ngram, editablePlay.play_id);
@@ -2405,9 +2412,12 @@
     const colTypeByKey = new Map(colDefs.map((c) => [c.key, c.type]));
     const numericRankIndex = buildNumericRankIndex(segmentsAllRows, colDefs);
     const granVal = gran.value;
+    const namesAvailable = nameFilterDataAvailable();
     const vocabToggle = document.getElementById('vocabNamesToggle');
-    if (vocabToggle) setElementHidden(vocabToggle, !isVocabGranularity(granVal));
-    const vocabEditablePlay = isVocabGranularity(granVal) ? vocabScopeSinglePlay() : null;
+    if (vocabToggle) setElementHidden(vocabToggle, !isVocabGranularity(granVal) || !namesAvailable);
+    const namesUnavailable = document.getElementById('vocabNamesUnavailable');
+    if (namesUnavailable) setElementHidden(namesUnavailable, !isVocabGranularity(granVal) || namesAvailable);
+    const vocabEditablePlay = (isVocabGranularity(granVal) && namesAvailable) ? vocabScopeSinglePlay() : null;
     renderNameFilterEditor();
 
     for (const r of paginatedRows) {
@@ -2829,9 +2839,16 @@
   // Proper-name exclusion lists — loaded from js/name-filter.js
   if (typeof window.initNameFilter === 'function') {
     window.initNameFilter({ playsById, characters, characterNameFilterConfig, onChange: () => doSearch() });
-    // A deep-linked vocabulary view rendered before the name filters existed;
-    // rebuild it now that they do (the version-stamped cache invalidates).
-    if (isVocabGranularity(gran.value) && vocabExcludeNames) doSearch();
+    // Vocabulary initially renders before the name filters exist. Rebuild it
+    // once availability is known, and ignore stale xn=1 links when unsupported.
+    if (isVocabGranularity(gran.value)) {
+      if (!nameFilterDataAvailable()) {
+        vocabExcludeNames = false;
+        const checkbox = document.getElementById('vocabNamesCheckbox');
+        if (checkbox) checkbox.checked = false;
+      }
+      doSearch();
+    }
   }
   if (typeof window.initCommentaryDetail === 'function') {
     window.initCommentaryDetail({ playsById, plays, commentaryInterestConfig, escapeHTML, onStateChange: updateDeepLink });

@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test('loads the Tanakh app and renders Hebrew content', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle(/Contabulate: תנ״ך/);
+  await expect(page).toHaveTitle('Contabulate: תנ״ך — Hebrew Bible Tabular Explorer');
   await page.waitForFunction(() => window.__contabulateReady === true);
   const baseHeaders = await page.locator('#results thead th').allTextContents();
   expect(baseHeaders.some((text) => text.includes('# verses'))).toBeTruthy();

@@ -12,6 +12,14 @@ The generated site lives in [docs](/Users/klaus/Projects/tanakh-contabulate/docs
 - Commentary-interest counts are generated from Sefaria-Export Tanakh commentary data: https://github.com/Sefaria/Sefaria-Export
 - The vocabulary views' proper-name exclusion lists ("Hide proper names", off by default) are extracted from morphhb morphology (proper-noun `Np` segments, including attested prefixed forms); when scoped to one book the list is editable in the UI, with edits kept per book in the browser's localStorage.
 
+## English lookup and glosses
+
+For readers without Hebrew, a lookup box above the term field finds Hebrew words by English meaning and inserts them as search terms (one written form, every form of a dictionary word, or a whole root). The word views add English, Dictionary form, and Root columns.
+
+- `scripts/glossary.py` builds `docs/data/glossary.json`. Lemmas are the augmented Strong numbers already on every word of the morphhb source; definitions, King James renderings, and roots come from the Open Scriptures Hebrew Lexicon in `source_text/lexicon` (`HebrewStrong.xml`, `LexicalIndex.xml`, `AugIndex.xml`; CC BY 4.0, pinned by SHA-256 in the script).
+- It is display-only: nothing in it is searched or counted, and the page works without it.
+- `docs/js/glossary.js` is shared verbatim with the other non-English Contabulate instances; change it in one place and copy it.
+
 ## Build
 
 Run:

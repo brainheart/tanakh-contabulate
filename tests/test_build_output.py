@@ -143,3 +143,48 @@ def test_token_indexes_include_common_hebrew_terms():
     assert len(tokens["אלהים"]) > 100
     assert len(tokens2["יהוה אלהים"]) > 10
     assert len(tokens3["בראשית ברא אלהים"]) == 1
+
+
+def test_glossary_covers_the_vocabulary_with_lemmas_glosses_and_roots():
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from scripts import glossary as glossary_module
+
+    glossary = load_json(DATA / "glossary.json")
+    tokens = load_json(DATA / "tokens.json")
+    forms, lemmas = glossary["forms"], glossary["lemmas"]
+    assert glossary["meta"] == {"lang": "he", "dir": "rtl"}
+    assert "Open Scriptures" in glossary["source"]
+    glossary_module.verify_lexicon(ROOT / "source_text" / "lexicon")
+
+    # Every written form of the search index, with the same counts.
+    assert set(forms) == set(tokens)
+    for form, (count, glosses, related) in forms.items():
+        assert count == sum(c for _, c in tokens[form]), form
+        assert all(0 <= i < len(lemmas) for i in related)
+    assert sum(1 for entry in forms.values() if not entry[1]) == 0
+
+    assert len(lemmas) == 9253
+    assert len({e["root"] for e in lemmas if e["root"]}) == 1803
+    assert [e["n"] for e in lemmas] == sorted((e["n"] for e in lemmas), reverse=True)
+    for entry in lemmas:
+        assert entry["n"] == sum(count for _, count in entry["forms"])
+        assert entry["lemma"] and entry["def"] and entry["w"], entry
+        assert all(count <= forms[form][0] for form, count in entry["forms"])
+
+    by_gloss = {e["def"]: e for e in reversed(lemmas)}
+    peace = by_gloss["completeness; safe, well, happy"]
+    assert (peace["n"], peace["root"], peace["pos"]) == (237, "שׁלם", "noun")
+    assert dict(peace["w"])["peace"] == 177  # in Strong's explanation, not the short definition
+    say = by_gloss["utter; say"]
+    assert (say["n"], dict(say["w"])["say"], dict(say["w"])["answer"]) == (5308, 5308, 1)
+    assert sum(e["n"] for e in lemmas if e["root"] == "שׁלם") == 774
+    assert forms["בראשית"][1] == ["beginning; first, firstfruit"]
+
+    # Prefixes written with a word are not lemmas; a bare prefix with a pronoun is.
+    assert glossary_module.lemma_key("c/d/776") == "776"
+    assert glossary_module.lemma_key("1254 a") == "1254a"
+    assert glossary_module.lemma_key("l") == "l"
+    assert glossary_module.lemma_key("") is None
+    assert glossary_module.display_gloss("completeness", ["safe", "well", "happy", "friendly"]) == "completeness; safe, well, happy"
+

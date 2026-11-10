@@ -1072,3 +1072,38 @@ tr.pd-name-excluded td {
 #nameFilterEditor {
   margin: 1rem 0 -0.5rem;
 }
+
+/* English lookup above the term field. */
+.lexicon { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding-bottom: .85rem; margin-bottom: .85rem; border-bottom: 1px solid var(--border, #d9cfb8); }
+.lexicon-input { flex: 1 1 14rem; max-width: 24rem; padding: .5rem .7rem; border: 1px solid var(--border, #d4c5b0); border-radius: 6px; background: #fff; font: inherit; color: inherit; }
+.lexicon-hint { flex: 1 1 14rem; font-size: .9rem; }
+.lexicon-results { flex: 1 1 100%; max-height: 24rem; overflow-y: auto; border: 1px solid var(--border, #d9cfb8); border-radius: 6px; background: #fffdf8; }
+.lexicon-item { padding: .6rem .8rem; border-bottom: 1px solid var(--border, #e6dcc6); }
+.lexicon-item:last-child { border-bottom: 0; }
+.lexicon-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .8rem; }
+.lexicon-insert { font: inherit; cursor: pointer; padding: .1rem .7rem; border: 1px solid var(--burgundy, #8b1538); border-radius: 6px; background: #fff; color: var(--burgundy, #8b1538); }
+.lexicon-insert:hover, .lexicon-insert:focus-visible { background: var(--burgundy, #8b1538); color: #fff; }
+.lexicon-lemma { font-size: 1.3rem; line-height: 1.6; }
+.lexicon-meaning { font-weight: 600; }
+.lexicon-meta, .lexicon-examples { font-size: .88rem; }
+.lexicon-examples { margin: .15rem 0 .4rem; }
+.lexicon-forms { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin-top: .35rem; }
+.lexicon-form { font: inherit; font-size: .88rem; cursor: pointer; padding: .05rem .5rem; border: 1px solid var(--border, #d9cfb8); border-radius: 999px; background: #fff; color: inherit; }
+.lexicon-form .lexicon-foreign { font-size: 1.1em; }
+.lexicon-form:hover, .lexicon-form:focus-visible { border-color: var(--burgundy, #8b1538); color: var(--burgundy, #8b1538); }
+.lexicon-root { border-style: dashed; }
+.lexicon-empty { margin: .7rem .8rem; }
+.word-gloss { min-width: 12rem; max-width: 26rem; }
+
+/* Long search terms in a column header: one short line until expanded. */
+.th-label-long { display: inline-block; max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.th-label-long.is-expanded { min-width: 16rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.term-col-expand { margin-left: .3rem; padding: 0 .35rem; border: 1px solid var(--border, #d4c5b0); border-radius: 999px; background: #fff; color: var(--burgundy, #8b1538); font: inherit; font-size: .72rem; line-height: 1.4; cursor: pointer; vertical-align: middle; }
+.term-col-expand:hover, .term-col-expand:focus-visible { border-color: var(--burgundy, #8b1538); }
+
+/* Hebrew in the lookup and in the dictionary-form and root columns. */
+.lexicon-foreign, td[data-key="lemma"], td[data-key="root"] {
+  font-family: 'SBL Hebrew', 'Ezra SIL', 'Frank Ruehl CLM', 'Noto Sans Hebrew', serif;
+  font-size: 1.15em;
+}
+.lexicon-lemma { font-size: 1.5rem; }

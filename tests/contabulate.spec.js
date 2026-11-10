@@ -166,7 +166,7 @@ test('vocabulary granularities put n-grams in the rows with doors both ways', as
   await expect(page.locator('#segmentsActiveFilters')).toContainText('starts with 01.01.Gen.001.');
 
   // An n-gram's verse count doors back into the matching verses
-  await page.locator('#results tbody tr').first().locator('td:nth-child(4) button.drill-link').click();
+  await page.locator('#results tbody tr').first().locator('td[data-key="verse_count"] button.drill-link').click();
   await expect(page.locator('#gran')).toHaveValue('line');
   await expect(page.locator('#results tbody .hit').first()).toBeVisible({ timeout: 15000 });
 });

@@ -526,6 +526,20 @@ def build(source_dir: Path, out_dir: Path) -> None:
         },
     )
     write_json(lines_dir / "all_lines.json", all_lines)
+    # English glosses, dictionary forms, and roots for every word form (reading aids).
+    from scripts.glossary import LEXICON_COMMIT, build_glossary
+    glossary, glossary_stats = build_glossary(
+        source_dir, [source_dir / f"{abbr}.xml" for _, _, abbr, _, _ in BOOK_ORDER],
+        tokenize_hebrew, extract_word_text)
+    (data_dir / "glossary.json").write_text(json.dumps({
+        "source": "Open Scriptures Hebrew Bible lemmas and the Open Scriptures Hebrew Lexicon "
+                  f"(openscriptures/HebrewLexicon@{LEXICON_COMMIT[:7]}, CC BY 4.0): Strong's dictionary "
+                  "and the Brown-Driver-Briggs lexical index",
+        "meta": {"lang": "he", "dir": "rtl"},
+        **glossary,
+    }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"Glossary: {glossary_stats['lemmas']} lemmas, {glossary_stats['roots']} roots, "
+          f"{glossary_stats['forms']} forms")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 // Data contract (data/glossary.json, written by the instance's build):
 //   meta:   { lang, dir }               language tag and direction of the corpus
 //   forms:  { form: [count, [glosses], [lemma indexes]] }
-//   lemmas: [{ lemma, pos, root?, n, def?, en: [example glosses],
+//   lemmas: [{ lemma, pos, root?, n, amb?, def?, en: [example glosses],
 //              w: [[english word, weight]], forms: [[form, count]] }]
 // The file must be identical in every instance: fix it once and copy it.
 
@@ -130,7 +130,9 @@
       if (inDefinition.includes(word)) exact = Math.max(1, Math.round(entry.n / 2));
       else if (word.length >= 4 && inDefinition.some(w => w.startsWith(word))) partial = Math.max(1, Math.round(entry.n / 2));
     }
-    return exact + partial / 2;
+    // A whole-word match always outranks a match on the beginning of a word:
+    // "sing" should find "to sing" before "singular".
+    return exact + partial / 1000;
   }
   function search(query, limit = 12) {
     if (!data) return [];
@@ -235,8 +237,13 @@
         head.appendChild(meaning);
         const meta = document.createElement('span');
         meta.className = 'muted lexicon-meta';
+        // Two kinds of honesty about spellings. `other`: occurrences the data
+        // assigns to different words written the same way. `amb`: where the
+        // data comes from a dictionary and cannot tell which word a spelling
+        // is in a given place, occurrences in spellings other words share.
         const caught = cover.other
-          ? `; the pattern also catches ${formatCellNumber(cover.other)} other use${cover.other === 1 ? '' : 's'} of the same spellings` : '';
+          ? `; the pattern also catches ${formatCellNumber(cover.other)} other use${cover.other === 1 ? '' : 's'} of the same spellings`
+          : (entry.amb ? `; ${formatCellNumber(entry.amb)} of these are in spellings other words share` : '');
         meta.textContent = `${entry.pos} · ${formatCellNumber(entry.n)}× in ${cover.forms.length} form${cover.forms.length === 1 ? '' : 's'}${caught}`;
         head.appendChild(meta);
         item.appendChild(head);
